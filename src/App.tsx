@@ -10,6 +10,7 @@ import { StorageImage } from "@aws-amplify/ui-react-storage"; //Hong
 
 import { MapboxOverlay, MapboxOverlayProps } from "@deck.gl/mapbox/typed";
 import { PickingInfo } from "@deck.gl/core/typed";
+import { PathStyleExtension } from "@deck.gl/extensions/typed";
 import "@aws-amplify/ui-react/styles.css";
 
 import "maplibre-gl/dist/maplibre-gl.css"; // Import maplibre-gl styles
@@ -380,6 +381,44 @@ function App() {
       // ...choice,
       // pointRadiusUnits: "pixels",
       pointType: "circle+text",
+    }),
+
+    new MVTLayer({
+      id: "wMain",
+      data: `https://a.tiles.mapbox.com/v4/hazensawyer.5764gcxp/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
+
+      minZoom: 0,
+      maxZoom: 23,
+      getLineColor: [31, 81, 255, 255],
+      opacity: 0.5,   
+      getFillColor: [140, 170, 180],
+      getLineWidth: 0.2,
+      lineWidthMinPixels: 1,
+      getDashArray: [10, 8],
+      dashJustified: true,
+      dashGapPickable: true,
+      extensions: [new PathStyleExtension({ dash: true })],
+      pickable: true,
+      visible: checked,
+    }),
+
+    new MVTLayer({
+      id: "sGravity",
+      data: `https://a.tiles.mapbox.com/v4/hazensawyer.54mpxvz3/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
+
+      minZoom: 0,
+      maxZoom: 23,
+      getLineColor: [50, 205, 50, 255],
+      opacity: 0.5,    
+      getFillColor: [140, 170, 180],
+      getLineWidth: 0.2,
+      lineWidthMinPixels: 1,
+      getDashArray: [10, 8],
+      dashJustified: true,
+      dashGapPickable: true,
+      extensions: [new PathStyleExtension({ dash: true })],
+      pickable: true,
+      visible: checked,
     }),
   ];
 
