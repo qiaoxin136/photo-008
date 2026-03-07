@@ -1,0 +1,63 @@
+.popup {
+  font-size: 13px;
+  min-width: 220px;
+  max-width: 280px;
+}
+
+.popup-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.popup-type-badge {
+  background: #2b6cb0;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.popup-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.popup-table tr {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.popup-table tr:last-child {
+  border-bottom: none;
+}
+
+.popup-table td {
+  padding: 4px 2px;
+  vertical-align: top;
+}
+
+.popup-table td:first-child {
+  color: #718096;
+  font-weight: 500;
+  white-space: nowrap;
+  padding-right: 10px;
+  width: 40%;
+}
+
+.popup-table td:last-child {
+  color: #2d3748;
+}
+
+.popup-id {
+  font-family: monospace;
+  font-size: 10px;
+  color: #a0aec0 !important;
+  word-break: break-all;
+}

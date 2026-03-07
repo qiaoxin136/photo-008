@@ -1,0 +1,79 @@
+.map-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Loading / Error overlay */
+.overlay-status {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #2d3748;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.overlay-error {
+  color: #c53030;
+  background: rgba(255, 245, 245, 0.97);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #2b6cb0;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Legend */
+.map-legend {
+  position: absolute;
+  bottom: 36px;
+  left: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+}
+
+.legend-title {
+  font-weight: 600;
+  color: #1a202c;
+  margin-bottom: 6px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4a5568;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #2b6cb0;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px #2b6cb0;
+  flex-shrink: 0;
+}

@@ -1,30 +1,42 @@
-import type { ChangeEvent, SyntheticEvent } from "react";
-import { useEffect, useState, useMemo } from "react";
+import type { ChangeEvent, /* SyntheticEvent */ } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { checkLoginAndGetName } from "./utils/AuthUtils";
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from "aws-amplify/data";
 import "@aws-amplify/ui-react/styles.css";
-import { uploadData, remove } from "aws-amplify/storage";
+import { /* uploadData, */ remove } from "aws-amplify/storage";
 import { StorageImage } from "@aws-amplify/ui-react-storage"; //Hong
 
-import { MapboxOverlay, MapboxOverlayProps } from "@deck.gl/mapbox/typed";
-import { PickingInfo } from "@deck.gl/core/typed";
-import { PathStyleExtension } from "@deck.gl/extensions/typed";
+import type { MapMouseEvent } from "mapbox-gl";
+
+
+import 'mapbox-gl/dist/mapbox-gl.css';
+//import { useGeoJSON } from './useGeoJSON';
+import { FeaturePopup } from './FeaturePopup';
+import type { WaterFeatureProperties } from './types';
+import './MapView.css';
+
+//import { MapboxOverlay, MapboxOverlayProps } from "@deck.gl/mapbox/typed";
+//import { PickingInfo } from "@deck.gl/core/typed";
+
 import "@aws-amplify/ui-react/styles.css";
 
 import "maplibre-gl/dist/maplibre-gl.css"; // Import maplibre-gl styles
 
 import {
   Map,
-  useControl,
-  Popup,
-  Marker,
+  Source,
+  Layer,
+  //useControl,
+  //Popup,
+  //Marker,
   NavigationControl,
   GeolocateControl,
+  ScaleControl
 } from "react-map-gl";
 
-import maplibregl from "maplibre-gl";
+
 
 import "mapbox-gl/dist/mapbox-gl.css";
 
@@ -44,18 +56,17 @@ import {
   Tabs,
   SelectField,
   ScrollView,
-  CheckboxField,
+  //CheckboxField,
   // TextField,
 } from "@aws-amplify/ui-react";
 
 import "@aws-amplify/ui-react/styles.css";
 
 import "@aws-amplify/ui-react/styles.css";
-import { GeoJsonLayer } from "@deck.gl/layers/typed";
-//import { IconLayer } from "@deck.gl/layers/typed";
-import { MVTLayer } from "@deck.gl/geo-layers/typed";
-import { TextLayer } from "@deck.gl/layers/typed";
 
+//import { IconLayer } from "@deck.gl/layers/typed";
+
+const MAPBOX_TOKEN = "pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmMnY0NzE1MGMzMjNycGp6bDQwcWZsNyJ9.1JJeWIQgrykU5b3oqSr1sQ";
 const client = generateClient<Schema>();
 
 type ByCategory = Record<string, { count: number; sum: number }>;
@@ -90,22 +101,22 @@ const theme: Theme = {
   },
 };
 
-type DataT = {
-  type: "Feature";
-  id: number;
-  geometry: {
-    type: "Point";
-    coordinates: [number, number, number];
-  };
-  properties: {
-    track: number;
-    type: string;
-    status: string;
-    date: string;
-    time: string;
-    id: string;
-  };
-};
+// type DataT = {
+//   type: "Feature";
+//   id: number;
+//   geometry: {
+//     type: "Point";
+//     coordinates: [number, number, number];
+//   };
+//   properties: {
+//     track: number;
+//     type: string;
+//     status: string;
+//     date: string;
+//     time: string;
+//     id: string;
+//   };
+// };
 
 type SelectOption = {
   value: string;
@@ -126,17 +137,12 @@ export type CustomEvent = {
 const MAP_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 // "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
-function DeckGLOverlay(
-  props: MapboxOverlayProps & {
-    interleaved?: boolean;
-  }
-) {
-  const overlay = useControl<MapboxOverlay>(() => new MapboxOverlay(props));
-  // @ts-ignore
-  overlay && overlay.setProps(props);
-  return null;
-}
 
+interface PopupInfo {
+  longitude: number;
+  latitude: number;
+  properties: WaterFeatureProperties;
+}
 
 
 function App() {
@@ -156,15 +162,21 @@ function App() {
   const [description, setDescription] = useState<string>("");
   const [lat, setLat] = useState(0);
   const [lng, setLng] = useState(0);
-  const [placePhotos, setPlacePhotos] = useState<File[]>([]);
+  //const [placePhotos, setPlacePhotos] = useState<File[]>([]);
 
   const [tab, setTab] = useState("1");
 
-  const [clickInfo, setClickInfo] = useState<DataT>();
-  const [showPopup, setShowPopup] = useState<boolean>(true);
-  const [checked, setChecked] = useState<boolean>(false);
+  //const [clickInfo, setClickInfo] = useState<DataT>();
+  //const [showPopup, setShowPopup] = useState<boolean>(true);
+
 
   const { totalSum, totalCount, byCategory } = useExpenseAggregates();
+
+  //const { data } = useGeoJSON();
+  const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
+  const [cursor, setCursor] = useState<string>('grab');
+
+
 
   const options: SelectOption[] = [
     { value: 'water', label: 'Water' },
@@ -173,273 +185,8 @@ function App() {
     { value: 'pavement', label: 'Pavement' }
   ];
 
-  console.log(AIR_PORTS);
+  //console.log(AIR_PORTS);
 
-  const layers = [
-
-
-    new GeoJsonLayer({
-      id: "history",
-      data: AIR_PORTS,
-      // Styles
-      filled: true,
-      pointType: "circle",
-      // iconAtlas:
-      //   "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.png",
-      // iconMapping:
-      //   "https://raw.githubusercontent.com/visgl/deck.gl-data/master/website/icon-atlas.json",
-      // getIcon: () => "marker",
-      // getIconSize: 5,
-      // getIconColor: (d: any) =>
-      //   d.properties.status === "true"
-      //     ? [80, 200, 120, 255]
-      //     : [220, 20, 60, 255],
-      // getIconAngle: 0,
-      // iconSizeUnits: "meters",
-      // iconSizeScale: 3,
-      // iconSizeMinPixels: 6,
-      // pointRadiusMinPixels: 2,
-      // pointRadiusScale: 5,
-      getFillColor: (d: any) =>
-        d.properties.type === "water"
-          ? [0, 0, 139, 255]
-          : d.properties.type === "wastewater"
-            ? [9, 121, 105, 255]
-            : d.properties.type === "stormwater"
-              ? [204, 85, 0, 255]
-              : [113, 121, 126, 255],
-      getText: (d: any) => d.properties.date,
-      getTextColor: [0, 0, 0, 255],
-      getTextSize: 32,
-      // getPointRadius: (f) => 11 - f.properties.scalerank,
-      //getFillColor: (d:any)=>(d.properties.status==="true" ?[220, 20, 60, 255]:[34, 35,25,255]),
-      // Interactive props
-      pickable: true,
-      autoHighlight: true,
-    }),
-
-    new TextLayer({
-      id: 'text-layer',
-      data: AIR_PORTS,
-      pickable: false,
-      getPosition: d => d.geometry.coordinates,
-      getText: d => d.data,
-      getSize: 16,
-      getAngle: 0,
-      getTextAnchor: 'middle',
-      getAlignmentBaseline: 'center',
-      getColor: [255, 255, 255]
-    }),
-
-    // new MVTLayer({
-    //   id: "lateral",
-    //   data: `https://a.tiles.mapbox.com/v4/hazensawyer.0t8hy4di/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-    //   minZoom: 0,
-    //   maxZoom: 23,
-    //   getLineColor: [169, 169, 169, 255],
-
-    //   getFillColor: [140, 170, 180],
-    //   getLineWidth: 1,
-
-    //   lineWidthMinPixels: 1,
-    //   pickable: true,
-    //   visible: checked,
-    // }),
-
-    // new MVTLayer({
-    //   id: "gravity-public-pipe",
-    //   data: `https://a.tiles.mapbox.com/v4/hazensawyer.04mlahe9/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-    //   minZoom: 0,
-    //   maxZoom: 23,
-    //   getLineColor: (f: any) =>
-    //     f.properties.DIAMETER < 11
-    //       ? [0, 163, 108, 255]
-    //       : f.properties.DIAMETER < 17
-    //         ? [218, 112, 214, 255]
-    //         : f.properties.DIAMETER < 25
-    //           ? [93, 63, 211, 255]
-    //           : f.properties.DIAMETER < 31
-    //             ? [191, 64, 191, 255]
-    //             : [238, 75, 43, 255],
-    //   getFillColor: [140, 170, 180],
-    //   getLineWidth: (f: any) =>
-    //     f.properties.DIAMETER < 7
-    //       ? 1
-    //       : f.properties.DIAMETER < 11
-    //         ? 3
-    //         : f.properties.DIAMETER < 17
-    //           ? 5
-    //           : f.properties.DIAMETER < 25
-    //             ? 7
-    //             : f.properties.DIAMETER < 31
-    //               ? 9
-    //               : 11,
-
-    //   lineWidthMinPixels: 1,
-    //   pickable: true,
-    //   visible: checked,
-    // }),
-
-    // new MVTLayer({
-    //   id: "gravity-private-pipe",
-    //   data: `https://a.tiles.mapbox.com/v4/hazensawyer.dhp8w8ur/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-    //   minZoom: 0,
-    //   maxZoom: 23,
-    //   getLineColor: (f: any) =>
-    //     f.properties.DIAMETER < 11
-    //       ? [0, 163, 108, 255]
-    //       : f.properties.DIAMETER < 17
-    //         ? [218, 112, 214, 255]
-    //         : f.properties.DIAMETER < 25
-    //           ? [93, 63, 211, 255]
-    //           : f.properties.DIAMETER < 31
-    //             ? [191, 64, 191, 255]
-    //             : [238, 75, 43, 255],
-
-    //   getFillColor: [140, 170, 180],
-    //   getLineWidth: (f: any) =>
-    //     f.properties.DIAMETER < 7
-    //       ? 1
-    //       : f.properties.DIAMETER < 11
-    //         ? 3
-    //         : f.properties.DIAMETER < 17
-    //           ? 5
-    //           : f.properties.DIAMETER < 25
-    //             ? 7
-    //             : f.properties.DIAMETER < 31
-    //               ? 9
-    //               : 11,
-
-    //   lineWidthMinPixels: 1,
-    //   pickable: true,
-    //   visible: checked,
-    // }),
-
-    // new MVTLayer({
-    //   id: "fmpipe",
-    //   data: `https://a.tiles.mapbox.com/v4/hazensawyer.4hfx5po8/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-    //   minZoom: 0,
-    //   maxZoom: 23,
-    //   getLineColor: (f: any) =>
-    //     f.properties.DIAMETER < 10
-    //       ? [128, 0, 32, 255]
-    //       : f.properties.DIAMETER < 20
-    //         ? [233, 116, 81, 255]
-    //         : [255, 195, 0, 255],
-    //   getFillColor: [140, 170, 180],
-    //   getLineWidth: (f: any) =>
-    //     f.properties.DIAMETER < 7
-    //       ? 1
-    //       : f.properties.DIAMETER < 11
-    //         ? 3
-    //         : f.properties.DIAMETER < 17
-    //           ? 4
-    //           : f.properties.DIAMETER < 25
-    //             ? 5
-    //             : f.properties.DIAMETER < 31
-    //               ? 6
-    //               : 7,
-
-    //   lineWidthMinPixels: 1,
-    //   pickable: true,
-    //   visible: checked,
-    // }),
-
-    // new MVTLayer({
-    //   id: "mh",
-    //   data: `https://a.tiles.mapbox.com/v4/hazensawyer.56zc2nx5/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-    //   minZoom: 15,
-    //   maxZoom: 23,
-    //   filled: true,
-    //   getIconAngle: 0,
-    //   getIconColor: [0, 0, 0, 255],
-    //   getIconPixelOffset: [-2, 2],
-    //   getIconSize: 3,
-    //   // getText: (f) => f.properties.FACILITYID,
-    //   getPointRadius: 2,
-    //   getTextAlignmentBaseline: "center",
-    //   getTextAnchor: "middle",
-    //   getTextAngle: 0,
-    //   getTextBackgroundColor: [0, 0, 0, 255],
-    //   getTextBorderColor: [0, 0, 0, 255],
-    //   getTextBorderWidth: 0,
-    //   getTextColor: [0, 0, 0, 255],
-    //   getTextPixelOffset: [-12, -12],
-    //   getTextSize: 20,
-    //   pointRadiusMinPixels: 2,
-
-    //   // getPointRadius: (f) => (f.properties.PRESSURE < 45 ? 6 : 3),
-    //   getFillColor: [255, 195, 0, 255],
-    //   // Interactive props
-    //   pickable: true,
-    //   visible: checked,
-    //   autoHighlight: true,
-    //   // ...choice,
-    //   // pointRadiusUnits: "pixels",
-    //   pointType: "circle+text",
-    // }),
-
-    new MVTLayer({
-      id: "wMain",
-      data: `https://a.tiles.mapbox.com/v4/hazensawyer.5764gcxp/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-      minZoom: 0,
-      maxZoom: 23,
-      getLineColor: [31, 81, 255, 255],
-      opacity: 0.5,   
-      getFillColor: [140, 170, 180],
-      getLineWidth: 0.2,
-      lineWidthMinPixels: 1,
-      getDashArray: [10, 8],
-      dashJustified: true,
-      dashGapPickable: true,
-      extensions: [new PathStyleExtension({ dash: true })],
-      pickable: true,
-      visible: checked,
-    }),
-
-    new MVTLayer({
-      id: "sGravity",
-      data: `https://a.tiles.mapbox.com/v4/hazensawyer.54mpxvz3/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-      minZoom: 0,
-      maxZoom: 23,
-      getLineColor: [50, 205, 50, 255],
-      opacity: 0.5,    
-      getFillColor: [140, 170, 180],
-      getLineWidth: 0.2,
-      lineWidthMinPixels: 1,
-      getDashArray: [10, 8],
-      dashJustified: true,
-      dashGapPickable: true,
-      extensions: [new PathStyleExtension({ dash: true })],
-      pickable: true,
-      visible: checked,
-    }),
-
-    new MVTLayer({
-      id: "sDrain",
-      data: `https://a.tiles.mapbox.com/v4/hazensawyer.6439un68/{z}/{x}/{y}.vector.pbf?access_token=pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmNGQ3MDgyMTE3YjQzcnE1djRpOGVtNiJ9.U06GItbSVWFTsvfg9WwQWQ`,
-
-      minZoom: 0,
-      maxZoom: 23,
-      getLineColor: [255, 127, 80, 255],
-      opacity: 0.5,    
-      getFillColor: [140, 170, 180],
-      getLineWidth: 0.2,
-      lineWidthMinPixels: 1,
-      getDashArray: [10, 8],
-      dashJustified: true,
-      dashGapPickable: true,
-      extensions: [new PathStyleExtension({ dash: true })],
-      pickable: true,
-      visible: checked,
-    }),
-  ];
 
   const handleDate = (e: ChangeEvent<HTMLInputElement>) => {
     setDate(e.target.value);
@@ -524,31 +271,31 @@ function App() {
     setLng(0);
   }
 
-  async function deleteLocation2(id: string, photourls: (string|null)[]) :
-    Promise<{ 
-      response: number 
+  async function deleteLocation2(id: string, photourls: (string | null)[]):
+    Promise<{
+      response: number
       info: string
-  }>{
+    }> {
     console.log('called delete location ')
     console.log("id=", id)
-    console.log("photourl=", photourls )
+    console.log("photourl=", photourls)
 
-    photourls.forEach( 
-            async (aPath) => {
-                if (aPath) 
-                    try{ 
-                       await remove({ path: aPath })
-                    }catch(error) {
-                        console.error('Error deleting photoes:', error);
-                        return {response: 299, info:'failed'}
-                    } 
-            }
+    photourls.forEach(
+      async (aPath) => {
+        if (aPath)
+          try {
+            await remove({ path: aPath })
+          } catch (error) {
+            console.error('Error deleting photoes:', error);
+            return { response: 299, info: 'failed' }
+          }
+      }
     )
 
-    
+
     client.models.Location.delete({ id })
 
-    return {response:200, info:'success'};
+    return { response: 200, info: 'success' };
     /*
     const result = await deleteLocationPhotos(id)
     if (result.response == 200 ) {
@@ -560,230 +307,136 @@ function App() {
 
   async function deleteLocation(id: string) {
     const result = await deleteLocationPhotos(id)
-    console.log( "result =", result.response)
-    if (result.response == 200 ) {
+    console.log("result =", result.response)
+    if (result.response == 200) {
       client.models.Location.delete({ id })
-    }else {
+    } else {
       console.log(" error to delete photos ")
     }
   }
 
-  function getTooltip(info: PickingInfo) {
-    const d = info.object as DataT;
-    if (d) {
-      // console.log(info);
-      if (info.layer?.id === "history") {
-        return {
-          html: `<u>History</u> <br>
-          <div>Date: ${d.properties.date}</div>
-          <div>Time: ${d.properties.time}</div>
-           <div>track: ${d.properties.track}</div>
-        <div>Type: ${d.properties.type}</div>`,
-          style: {
-            backgroundColor: "#AFE1AF",
-            color: "#000",
-            padding: "5px",
-            borderRadius: "3px",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-          },
-        };
-      } else if (info.layer?.id === "mh") {
-        return {
-          html: `<u>Manhole</u> <br>`,
-          style: {
-            backgroundColor: "#AFE1AF",
-            color: "#000",
-            padding: "5px",
-            borderRadius: "3px",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-          },
-        };
-      } else if (info.layer?.id === "gravity-public-pipe") {
-        return {
-          html: `<u>Gravity</u><br>`,
-          style: {
-            backgroundColor: "#AFE1AF",
-            color: "#000",
-            padding: "5px",
-            borderRadius: "3px",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-          },
-        };
-      } else if (info.layer?.id === "gravity-private-pipe") {
-        return {
-          html: `<u>Gravity</u><br>`,
-          style: {
-            backgroundColor: "#AFE1AF",
-            color: "#000",
-            padding: "5px",
-            borderRadius: "3px",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-          },
-        };
-      } else if (info.layer?.id === "fmpipe") {
-        return {
-          html: `<u>Force Main</u><br>`,
-          style: {
-            backgroundColor: "#AFE1AF",
-            color: "#000",
-            padding: "5px",
-            borderRadius: "3px",
-            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-          },
-        };
-      } else {
-      }
-    }
-    return null;
-  }
-
-  function onClick(info: PickingInfo) {
-    //const safeInfo=info|| [];
-    const f = info.coordinate as [number, number];
-    setLng(Number(f[0].toFixed(25)));
-    setLat(Number(f[1].toFixed(25)));
-
-    const d = info.object as DataT;
-    if (d) {
-      setClickInfo(d);
-      //console.log(clickInfo);
-      console.log(showPopup);
-      return {
-        html: `<div>${d.properties.date}</div></br>
-          <div>${d.properties.time}</div></br>
-         <div>${d.properties.type}</div></br>`,
-        style: {
-          backgroundColor: "#AFE1AF",
-          color: "#000",
-          padding: "5px",
-          borderRadius: "3px",
-          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
-        },
-      };
-    }
-
-    return null;
-
-  }
-
-   async function handleSubmit(event: SyntheticEvent, id: string) {
-    event.preventDefault();
-    //console.log(id);
-    //console.log(userName);
-
-    if (userName) {
-      let placePhotosUrls: string[] = [];
-      console.log("before submit, photoes size ", placePhotos.length);
-      const uploadResult = await uploadPhotos(placePhotos, id)   //Hong
-      placePhotosUrls = uploadResult.urls;
-
-      const currentLoc= await client.models.Location.get( {
-         id: id
-      })
-
-      let revised:string[] = []
-      if ( currentLoc.data?.photos) {
-         currentLoc.data.photos.forEach( 
-           (d)=>{
-              d? revised.push(d):null
-           }
-         )
-      }
-
-      await client.models.Location.update({
-        id: id,
-        photos: [...placePhotosUrls,...revised]
-
-      })
 
 
-      clearFields();
-    }
-  }
 
-  function clearFields() {
-    //setuserName('');
-    setPlacePhotos([]);
-  }
 
-  async function uploadPhotos(files: File[], id: string): Promise<{
-    urls: string[]
+  // async function handleSubmit(event: SyntheticEvent, id: string) {
+  //   event.preventDefault();
+  //   //console.log(id);
+  //   //console.log(userName);
 
-  }> {
-    const urls: string[] = [];
-    console.log('start to upload photos')
-    console.log('# of files', files.length)
+  //   if (userName) {
+  //     let placePhotosUrls: string[] = [];
+  //     console.log("before submit, photoes size ", placePhotos.length);
+  //     const uploadResult = await uploadPhotos(placePhotos, id)   //Hong
+  //     placePhotosUrls = uploadResult.urls;
 
-    for (const file of files) {
-      console.log(`uploading file ${file.name}`)
-      const result = await uploadData({
-        data: file,
-        path: `originals/${id}/${file.name}`
-      }).result
-      urls.push(result.path);
-      console.log('url is ', urls);
+  //     const currentLoc = await client.models.Location.get({
+  //       id: id
+  //     })
 
-    }
-    return {
-      urls,
+  //     let revised: string[] = []
+  //     if (currentLoc.data?.photos) {
+  //       currentLoc.data.photos.forEach(
+  //         (d) => {
+  //           d ? revised.push(d) : null
+  //         }
+  //       )
+  //     }
 
-    };
-  }
+  //     await client.models.Location.update({
+  //       id: id,
+  //       photos: [...placePhotosUrls, ...revised]
+
+  //     })
+
+
+  //     clearFields();
+  //   }
+  // }
+
+  // function clearFields() {
+  //   //setuserName('');
+  //   setPlacePhotos([]);
+  // }
+
+  // async function uploadPhotos(files: File[], id: string): Promise<{
+  //   urls: string[]
+
+  // }> {
+  //   const urls: string[] = [];
+  //   console.log('start to upload photos')
+  //   console.log('# of files', files.length)
+
+  //   for (const file of files) {
+  //     console.log(`uploading file ${file.name}`)
+  //     const result = await uploadData({
+  //       data: file,
+  //       path: `originals/${id}/${file.name}`
+  //     }).result
+  //     urls.push(result.path);
+  //     console.log('url is ', urls);
+
+  //   }
+  //   return {
+  //     urls,
+
+  //   };
+  // }
 
   //Hong's addition
-  function previewPhotos(event: CustomEvent) {
-        
-        if (event.target.files) {
-            const eventPhotos = Array.from(event.target.files);
-            //const newFiles: File[] = [...new Set([...eventPhotos, ...placePhotos])]
-            //console.log("newFiles =", newFiles)
-            //setPlacePhotos(newFiles);
-            setPlacePhotos(eventPhotos)
-        }
-  }
+  // function previewPhotos(event: CustomEvent) {
+
+  //   if (event.target.files) {
+  //     const eventPhotos = Array.from(event.target.files);
+  //     //const newFiles: File[] = [...new Set([...eventPhotos, ...placePhotos])]
+  //     //console.log("newFiles =", newFiles)
+  //     //setPlacePhotos(newFiles);
+  //     setPlacePhotos(eventPhotos)
+  //   }
+  // }
 
   function renderPhotos() {
 
     const rows: any[] = []
 
-        if (location ) {
+    if (location) {
 
-            location.forEach ( (loc, index) => {
-              if (loc.photos) {
+      location.forEach((loc, index) => {
+        if (loc.photos) {
 
-                rows.push(
-                  <h4>Date: {loc.date}  &nbsp; &nbsp;&nbsp; Description: {loc.description} 
-                  &nbsp; &nbsp; &nbsp;</h4>)
-                loc.photos.forEach((photo, idx ) => {
-                  if (photo) {
-                    rows.push(<StorageImage path={photo} 
-                      alt={photo} key={index*1000+idx} height={300} 
-                      style={{marginLeft: '10px'}}/>)
-                  }
-                })
-                 
-              }
-            })
+          rows.push(
+            <h4>Date: {loc.date}  &nbsp; &nbsp;&nbsp; Description: {loc.description}
+              &nbsp; &nbsp; &nbsp;</h4>)
+          loc.photos.forEach((photo, idx) => {
+            if (photo) {
+              rows.push(<StorageImage path={photo}
+                alt={photo} key={index * 1000 + idx} height={300}
+                style={{ marginLeft: '10px' }} />)
+            }
+          })
+
         }
-        return rows;
+      })
     }
+    return rows;
+  }
 
-   async function deleteLocationPhotos( locId: string): Promise<{
-    response: number 
+  async function deleteLocationPhotos(locId: string): Promise<{
+    response: number
     info: string
-    }> {
-         console.log( "Loc Id = " + locId)
-         if (location) {
-            try{ 
-              
-                await remove({ path: `originals/${locId}` })
-            }catch(error) {
-                console.error('Error deleting photoes:', error);
-                return {response: 299, info:'failed'}
-            } 
-          }
-          return {response:200, info:'success'};
+  }> {
+    console.log("Loc Id = " + locId)
+    if (location) {
+      try {
+
+        await remove({ path: `originals/${locId}` })
+      } catch (error) {
+        console.error('Error deleting photoes:', error);
+        return { response: 299, info: 'failed' }
+      }
     }
+    return { response: 200, info: 'success' };
+  }
 
   //end Hong's addition
 
@@ -824,7 +477,20 @@ function App() {
     return aggregates;
   }
 
+  const onClick = useCallback((e: MapMouseEvent) => {
+    const feature = e.features?.[0];
+    console.log("clicked feature =", feature);
+    if (!feature || feature.geometry.type !== 'Point') return;
+    const [lng, lat] = feature.geometry.coordinates;
+    setPopupInfo({
+      longitude: lng,
+      latitude: lat,
+      properties: feature.properties as WaterFeatureProperties,
+    });
+  }, []);
 
+  const onMouseEnter = useCallback(() => setCursor('pointer'), []);
+  const onMouseLeave = useCallback(() => setCursor('grab'), []);
 
   return (
     <main>
@@ -918,22 +584,81 @@ function App() {
                   latitude: 26.00068,
                   zoom: 16,
                 }}
-                mapLib={maplibregl}
+                mapboxAccessToken={MAPBOX_TOKEN}
+                //mapLib={maplibregl}
                 mapStyle={MAP_STYLE} // Use any MapLibre-compatible style
                 style={{
                   width: "100%",
                   height: "800px",
                   borderColor: "#000000",
                 }}
+                interactiveLayerIds={['water-points']}
+                onClick={onClick}
+                onMouseEnter={onMouseEnter}
+                onMouseLeave={onMouseLeave}
+                cursor={cursor}
               >
-                <DeckGLOverlay
-                  layers={layers}
-                  getTooltip={getTooltip}
-                  onClick={onClick}
+                <Source id="water-data" type="geojson" data={AIR_PORTS}>
 
-                />
-                <Marker latitude={Number(lat.toFixed(10))} longitude={Number(lng.toFixed(10))} />
-                {clickInfo && (
+                  <Layer
+                    id='water-points'
+                    type='circle'
+                    source='water-data'
+                    paint={{
+                      'circle-radius': [
+                        'interpolate', ['linear'], ['zoom'],
+                        12, 6,
+                        16, 10,
+                        20, 16,
+                      ],
+                      'circle-color': '#2b6cb0',
+                      'circle-stroke-color': '#ffffff',
+                      'circle-stroke-width': 2,
+                      'circle-opacity': 0.9,
+                    }}
+                  />
+                </Source>
+
+                <Source id="wMain" type="vector" url="mapbox://hazensawyer.5764gcxp">
+                  <Layer
+                    id='water-lines'
+                    type='line'
+                    source='wMain'
+                    source-layer="wMain-1r1fzu"
+                    paint={{
+                      'line-width': 1,
+                      // Use a get expression (https://docs.mapbox.comhttps://docs.mapbox.com/style-spec/reference/expressions/#get)
+                      // to set the line-color to a feature property value.
+                      'line-color': "#97bcef",
+                      'line-dasharray': [4, 2]
+                    }}
+                  />
+                </Source>
+                <Source id="gravity" type="vector" url="mapbox://hazensawyer.54mpxvz3">
+                  <Layer
+                    id='gravity-lines'
+                    type='line'
+                    source='gravity'
+                    source-layer="sGravity-d079ci"
+                    paint={{
+                      'line-width': 1,
+                      // Use a get expression (https://docs.mapbox.comhttps://docs.mapbox.com/style-spec/reference/expressions/#get)
+                      // to set the line-color to a feature property value.
+                      'line-color': "#94edbb",
+                      'line-dasharray': [4, 2]
+                    }}
+                  />
+                </Source>
+                {popupInfo && (
+                  <FeaturePopup
+                    longitude={popupInfo.longitude}
+                    latitude={popupInfo.latitude}
+                    properties={popupInfo.properties}
+                    onClose={() => setPopupInfo(null)}
+                  />
+                )}
+
+                {/* {clickInfo && (
                   <Popup
                     key={`${clickInfo.geometry.coordinates[0]}-${clickInfo.geometry.coordinates[1]}`}
                     latitude={clickInfo.geometry.coordinates[1]}
@@ -958,11 +683,11 @@ function App() {
 
 
                     <label>Place photos:</label><br />
-                    <input type="file" multiple 
-                     onChange={(e) => previewPhotos(e)}
-                     placeholder="new picture"
+                    <input type="file" multiple
+                      onChange={(e) => previewPhotos(e)}
+                      placeholder="new picture"
                     /><br />
-                    
+
                     <Button
                       onClick={(e) => {
                         console.log(clickInfo.properties);
@@ -973,8 +698,9 @@ function App() {
                       Upload
                     </Button>
                   </Popup>
-                )}
+                )} */}
                 <NavigationControl position="top-right" />
+                <ScaleControl position="bottom-right" />
                 <GeolocateControl position="top-right" positionOptions={{ enableHighAccuracy: true }}
                   trackUserLocation={true}
                   // Draw an arrow next to the location dot to indicate which direction the device is heading.
@@ -989,14 +715,6 @@ function App() {
                       You are here
                     </Popup>
                   )} */}
-                <CheckboxField
-                  name="subscribe-controlled"
-                  value="yes"
-                  checked={checked}
-                  onChange={(e) => setChecked(e.target.checked)}
-                  //onChange={handleRoundChange}
-                  label="Base Layers"
-                />
               </Map>
             </>)
           },
@@ -1042,37 +760,37 @@ function App() {
                         <TableCell as="th" /* style={{ width: '15%' }} */>Latitude</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Longitude</TableCell>
                       </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {location.map((location) => (
-                          <TableRow
-                            onDoubleClick={(e) =>{
-                                console.log( "location photos url =", location.photos)
-                                console.log(e)
-                                if ( location.photos)
-                                  deleteLocation2(location.id, location.photos)
-                                else 
-                                  deleteLocation(location.id)
-                            } 
+                    </TableHead>
+                    <TableBody>
+                      {location.map((location) => (
+                        <TableRow
+                          onDoubleClick={(e) => {
+                            console.log("location photos url =", location.photos)
+                            console.log(e)
+                            if (location.photos)
+                              deleteLocation2(location.id, location.photos)
+                            else
+                              deleteLocation(location.id)
+                          }
 
 
-                            }
-                            key={location.id}
-                          >
-                            <TableCell /* width="15%" */>{location.date}</TableCell>
-                            <TableCell /* width="15%" */>{location.time}</TableCell>
-                            <TableCell /* width="10%" */>{location.track}</TableCell>
-                            <TableCell /* width="15%" */>{location.type}</TableCell>
-                            <TableCell /* width="15%" */>{location.username}</TableCell>
-                            <TableCell /* width="15%" */>{location.diameter}</TableCell>
-                            <TableCell /* width="15%" */>{location.length}</TableCell>
-                            <TableCell /* width="15%" */>{location.photos? location.photos.length:0}</TableCell>
-                            <TableCell /* width="15%" */>{location.lat}</TableCell>
-                            <TableCell /* width="15%" */>{location.lng}</TableCell>  
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    
+                          }
+                          key={location.id}
+                        >
+                          <TableCell /* width="15%" */>{location.date}</TableCell>
+                          <TableCell /* width="15%" */>{location.time}</TableCell>
+                          <TableCell /* width="10%" */>{location.track}</TableCell>
+                          <TableCell /* width="15%" */>{location.type}</TableCell>
+                          <TableCell /* width="15%" */>{location.username}</TableCell>
+                          <TableCell /* width="15%" */>{location.diameter}</TableCell>
+                          <TableCell /* width="15%" */>{location.length}</TableCell>
+                          <TableCell /* width="15%" */>{location.photos ? location.photos.length : 0}</TableCell>
+                          <TableCell /* width="15%" */>{location.lat}</TableCell>
+                          <TableCell /* width="15%" */>{location.lng}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+
                   </Table>
                 </ThemeProvider>
               </ScrollView>
