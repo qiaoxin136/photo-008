@@ -183,6 +183,7 @@ function App() {
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
   const [cursor, setCursor] = useState<string>('grab');
+  const [calResult, setCalResult] = useState<string>("");
 
 
 
@@ -485,6 +486,45 @@ function App() {
     return aggregates;
   }
 
+  function haversineDistanceFeet(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 20902231; // Earth radius in feet
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function calculateDistanceToLastPoint() {
+    if (!lat || !lng) {
+      setCalResult("Please click a point on the map first.");
+      return;
+    }
+    const sameTrack = location.filter((loc) => loc.track === track);
+    if (sameTrack.length === 0) {
+      setCalResult(`Track ${track} — dist to last point: 0.0 ft / 0.000 mi`);
+      setLength(0);
+      return;
+    }
+    const sorted = [...sameTrack].sort((a, b) => {
+      const aStr = `${a.date ?? ""}T${a.time ?? "00:00:00"}`;
+      const bStr = `${b.date ?? ""}T${b.time ?? "00:00:00"}`;
+      return aStr.localeCompare(bStr);
+    });
+    const last = sorted[sorted.length - 1];
+    if (last.lat == null || last.lng == null) {
+      setCalResult("Last point in this track has no coordinates.");
+      return;
+    }
+    const distFt = haversineDistanceFeet(lat, lng, last.lat, last.lng);
+    setLength(distFt);
+    setCalResult(
+      `Track ${track} — dist to last point (${last.date} ${last.time ?? ""}): ${distFt.toFixed(1)} ft / ${(distFt / 5280).toFixed(3)} mi`
+    );
+  }
+
   const onClick = useCallback((e: MapMouseEvent) => {
     const feature = e.features?.[0];
 
@@ -531,6 +571,14 @@ function App() {
         <Button onClick={createLocation} backgroundColor={"azure"} color={"red"}>
           + new
         </Button>
+        <Button onClick={calculateDistanceToLastPoint} backgroundColor={"lightyellow"} color={"darkgreen"}>
+          Cal
+        </Button>
+        {calResult && (
+          <span style={{ alignSelf: "center", fontSize: "0.9rem", color: "#333", marginLeft: "8px" }}>
+            {calResult}
+          </span>
+        )}
       </Flex>
       <br />
       <Flex direction="row">
