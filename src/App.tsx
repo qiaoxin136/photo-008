@@ -167,6 +167,7 @@ function App() {
   const [length, setLength] = useState<number>(0);
   const [userName, setUserName] = useState<string>();
   const [description, setDescription] = useState<string>("");
+  const [joint, setJoint] = useState<boolean>(true);
   const [lat, setLat] = useState(0);
   const [lng, setLng] = useState(0);
   const [placePhotos, setPlacePhotos] = useState<File[]>([]);
@@ -235,6 +236,10 @@ function App() {
     setDescription(e.target.value);
   }
 
+  const handleJoint = (e: ChangeEvent<HTMLInputElement>) => {
+    setJoint(e.target.checked);
+  }
+
   useEffect(() => {
 
     client.models.Location.observeQuery().subscribe({
@@ -263,8 +268,7 @@ function App() {
       length: length,
       username: name,
       description: description,
-
-
+      joint: joint,
       lat: lat,
       lng: lng,
 
@@ -276,6 +280,7 @@ function App() {
     setDiameter(diameter);
     setUserName("");
     setDescription("");
+    setJoint(false);
     setLat(0);
     setLng(0);
   }
@@ -647,6 +652,14 @@ function App() {
           onChange={handleDescription}
           width="800px"
         />
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Arial, sans-serif' }}>
+          <input
+            type="checkbox"
+            checked={joint}
+            onChange={handleJoint}
+          />
+          Joint
+        </label>
         {/* <Input type="number" value={Number(lat.toFixed(10))} />
         <Input type="number" value={Number(lng.toFixed(10))} /> */}
       </Flex>
@@ -865,6 +878,7 @@ function App() {
                         <TableCell as="th" /* style={{ width: '10%' }} */>Track</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Type</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>User</TableCell>
+                        <TableCell as="th" /* style={{ width: '15%' }} */>Joint</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Diameter</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Length</TableCell>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Images</TableCell>
@@ -893,6 +907,7 @@ function App() {
                           <TableCell /* width="10%" */>{location.track}</TableCell>
                           <TableCell /* width="15%" */>{location.type}</TableCell>
                           <TableCell /* width="15%" */>{location.username}</TableCell>
+                          <TableCell /* width="15%" */>{location.joint ? "Yes" : "No"}</TableCell>
                           <TableCell /* width="15%" */>{location.diameter}</TableCell>
                           <TableCell /* width="15%" */>{location.length}</TableCell>
                           <TableCell /* width="15%" */>{location.photos ? location.photos.length : 0}</TableCell>
