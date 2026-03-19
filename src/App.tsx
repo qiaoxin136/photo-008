@@ -179,7 +179,7 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { byTypeTrack, byType, byDiameterTypeTrack } = useExpenseAggregates();
+  const { byTypeTrack, byType, byDiameterTypeTrack, manholeItems } = useExpenseAggregates();
 
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
@@ -505,7 +505,11 @@ function App() {
         byDiameterTypeTrack[dKey].sum += amt;
       }
 
-      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack };
+      const manholeItems = items.filter(
+        (e) => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false
+      );
+
+      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack, manholeItems };
     }, [items]);
 
     return aggregates;
@@ -1032,6 +1036,18 @@ function App() {
                       ))}
                   </TableBody>
                 </Table>
+              </ThemeProvider>
+            </>)
+          },
+          {
+            label: "Manhole",
+            value: "8",
+            content: (<>
+              <ThemeProvider theme={theme} colorMode="light">
+                <p style={{ fontFamily: 'Arial, sans-serif', marginBottom: '8px' }}>
+                  <strong>Wastewater records with Joint = No:</strong> {manholeItems.length}
+                </p>
+                
               </ThemeProvider>
             </>)
           },
