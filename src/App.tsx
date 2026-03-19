@@ -179,7 +179,7 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const {  byTypeTrack, byType } = useExpenseAggregates();
+  const { byTypeTrack, byType, byDiameterTypeTrack } = useExpenseAggregates();
 
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
@@ -474,6 +474,7 @@ function App() {
       const byCategory: ByCategory = {};
       const byTypeTrack: Record<string, { type: string; track: string; count: number; sum: number }> = {};
       const byType: ByCategory = {};
+      const byDiameterTypeTrack: Record<string, { diameter: string; type: string; track: string; count: number; sum: number }> = {};
       let totalSum = 0;
 
       for (const e of items) {
@@ -496,9 +497,15 @@ function App() {
         if (!byType[typeVal]) byType[typeVal] = { count: 0, sum: 0 };
         byType[typeVal].count += 1;
         byType[typeVal].sum += amt;
+
+        const diamVal = String(e.diameter ?? "");
+        const dKey = `${diamVal}|${typeVal}|${trackVal}`;
+        if (!byDiameterTypeTrack[dKey]) byDiameterTypeTrack[dKey] = { diameter: diamVal, type: typeVal, track: trackVal, count: 0, sum: 0 };
+        byDiameterTypeTrack[dKey].count += 1;
+        byDiameterTypeTrack[dKey].sum += amt;
       }
 
-      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType };
+      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack };
     }, [items]);
 
     return aggregates;
@@ -984,6 +991,43 @@ function App() {
                           <TableCell>{type}</TableCell>
                           <TableCell>{v.count}</TableCell>
                           <TableCell>{v.sum.toFixed(0)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </ThemeProvider>
+            </>)
+          },
+          {
+            label: "Statistics by Diameter",
+            value: "7",
+            content: (<>
+              <ThemeProvider theme={theme} colorMode="light">
+                <Table caption="" highlightOnHover={false} variation="striped"
+                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell as="th">Type</TableCell>
+                      <TableCell as="th">Track</TableCell>
+                      <TableCell as="th">Diameter (in)</TableCell>
+                      <TableCell as="th">Count</TableCell>
+                      <TableCell as="th">Total Length (ft)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.values(byDiameterTypeTrack)
+                      .sort((a, b) =>
+                        a.type.localeCompare(b.type) ||
+                        a.track.localeCompare(b.track) ||
+                        parseFloat(a.diameter) - parseFloat(b.diameter)
+                      )
+                      .map((row) => (
+                        <TableRow key={`${row.diameter}|${row.type}|${row.track}`}>
+                          <TableCell>{row.type}</TableCell>
+                          <TableCell>{row.track}</TableCell>
+                          <TableCell>{row.diameter}</TableCell>
+                          <TableCell>{row.count}</TableCell>
+                          <TableCell>{row.sum.toFixed(0)}</TableCell>
                         </TableRow>
                       ))}
                   </TableBody>
