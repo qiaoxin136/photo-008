@@ -178,7 +178,7 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { totalSum, totalCount, byCategory } = useExpenseAggregates();
+  const {  byTypeTrack, byType } = useExpenseAggregates();
 
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
@@ -467,6 +467,8 @@ function App() {
 
     const aggregates = useMemo(() => {
       const byCategory: ByCategory = {};
+      const byTypeTrack: Record<string, { type: string; track: string; count: number; sum: number }> = {};
+      const byType: ByCategory = {};
       let totalSum = 0;
 
       for (const e of items) {
@@ -478,9 +480,20 @@ function App() {
         if (!byCategory[cat]) byCategory[cat] = { count: 0, sum: 0 };
         byCategory[cat].count += 1;
         byCategory[cat].sum += amt;
+
+        const typeVal = e.type ?? "";
+        const trackVal = String(e.track ?? "");
+        const key = `${typeVal}|${trackVal}`;
+        if (!byTypeTrack[key]) byTypeTrack[key] = { type: typeVal, track: trackVal, count: 0, sum: 0 };
+        byTypeTrack[key].count += 1;
+        byTypeTrack[key].sum += amt;
+
+        if (!byType[typeVal]) byType[typeVal] = { count: 0, sum: 0 };
+        byType[typeVal].count += 1;
+        byType[typeVal].sum += amt;
       }
 
-      return { totalSum, byCategory, totalCount: items.length };
+      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType };
     }, [items]);
 
     return aggregates;
@@ -895,28 +908,72 @@ function App() {
             </>)
           },
           {
-            label: "Statistics",
-            value: "3",
-            content: (<>
-              <div>
-                <h2>Total Length (ft): {totalSum.toFixed(0)} ({totalCount} items)</h2>
-
-                <ul>
-                  {Object.entries(byCategory).map(([cat, v]) => (
-                    <li key={cat}>
-                      {cat}: {v.sum.toFixed(0)} feet ({v.count} counts)
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </>)
-          },
-          {
             label: "Photos",
             value: "4",
             content: (<>
               <h3>Photos and Comments</h3>
               {renderPhotos()}
+            </>)
+          },
+          
+          {
+            label: "Statistics by Track",
+            value: "5",
+            content: (<>
+              <ThemeProvider theme={theme} colorMode="light">
+                <Table caption="" highlightOnHover={false} variation="striped"
+                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell as="th">Type</TableCell>
+                      <TableCell as="th">Track</TableCell>
+                      <TableCell as="th">Count</TableCell>
+                      <TableCell as="th">Total Length (ft)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.values(byTypeTrack)
+                      .sort((a, b) => a.track.localeCompare(b.track) || a.type.localeCompare(b.type))
+                      .map((row) => (
+                        <TableRow key={`${row.type}|${row.track}`}>
+                          <TableCell>{row.type}</TableCell>
+                          <TableCell>{row.track}</TableCell>
+                          <TableCell>{row.count}</TableCell>
+                          <TableCell>{row.sum.toFixed(0)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </ThemeProvider>
+            </>)
+          },
+          {
+            label: "Statistics by Type",
+            value: "6",
+            content: (<>
+              <ThemeProvider theme={theme} colorMode="light">
+                <Table caption="" highlightOnHover={false} variation="striped"
+                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell as="th">Type</TableCell>
+                      <TableCell as="th">Count</TableCell>
+                      <TableCell as="th">Total Length (ft)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(byType)
+                      .sort(([a], [b]) => a.localeCompare(b))
+                      .map(([type, v]) => (
+                        <TableRow key={type}>
+                          <TableCell>{type}</TableCell>
+                          <TableCell>{v.count}</TableCell>
+                          <TableCell>{v.sum.toFixed(0)}</TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
+              </ThemeProvider>
             </>)
           },
         ]}
