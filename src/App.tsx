@@ -219,9 +219,9 @@ function App() {
     setDiameter(parseInt(e.target.value));
   }
 
-  const handleLength = (e: ChangeEvent<HTMLInputElement>) => {
-    setLength(parseInt(e.target.value));
-  }
+  // const handleLength = (e: ChangeEvent<HTMLInputElement>) => {
+  //   setLength(parseInt(e.target.value));
+  // }
 
   const handleUserName = async () => {
     const name = await checkLoginAndGetName();
@@ -626,13 +626,7 @@ function App() {
           onChange={handleDiameter}
         //width="150%"
         />
-        <input
-          type="number"
-          value={length}
-          placeholder="length (ft)"
-          onChange={handleLength}
-        //width="150%"
-        />
+
         <Input
           type="text"
           value={description}
