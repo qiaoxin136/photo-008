@@ -179,7 +179,7 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { byTypeTrack, byType, byDiameterTypeTrack, manholeItems } = useExpenseAggregates();
+  const { byTypeTrack, byType, byDiameterTypeTrack, manholeItems, stormwaterNoJoint } = useExpenseAggregates();
 
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
@@ -508,8 +508,11 @@ function App() {
       const manholeItems = items.filter(
         (e) => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false
       );
+      const stormwaterNoJoint = items.filter(
+        (e) => (e.type ?? "").toLowerCase() === "stormwater" && e.joint === false
+      );
 
-      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack, manholeItems };
+      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack, manholeItems, stormwaterNoJoint };
     }, [items]);
 
     return aggregates;
@@ -1044,8 +1047,11 @@ function App() {
             value: "8",
             content: (<>
               <ThemeProvider theme={theme} colorMode="light">
+                <p style={{ fontFamily: 'Arial, sans-serif', marginBottom: '4px' }}>
+                  <strong>Number of Manholes in Wastewater System:</strong> {manholeItems.length}
+                </p>
                 <p style={{ fontFamily: 'Arial, sans-serif', marginBottom: '8px' }}>
-                  <strong>Wastewater records with Joint = No:</strong> {manholeItems.length}
+                  <strong>Numnber of Manholes in Stormwater System:</strong> {stormwaterNoJoint.length}
                 </p>
                 
               </ThemeProvider>
