@@ -174,6 +174,11 @@ function App() {
 
   const [tab, setTab] = useState("1");
   const [basemap, setBasemap] = useState("mapbox://styles/mapbox/streets-v12");
+  const [infoMode, setInfoMode] = useState(false);
+  const [infoCoords, setInfoCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [rulerMode, setRulerMode] = useState(false);
+  const [rulerPoints, setRulerPoints] = useState<{ lat: number; lng: number }[]>([]);
+  const [rulerDistance, setRulerDistance] = useState<number | null>(null);
 
   //const [clickInfo, setClickInfo] = useState<DataT>();
   //const [showPopup, setShowPopup] = useState<boolean>(true);
@@ -558,6 +563,25 @@ function App() {
   }
 
   const onClick = useCallback((e: MapMouseEvent) => {
+    if (infoMode) {
+      setInfoCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      return;
+    }
+    if (rulerMode) {
+      const pt = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+      setRulerPoints(prev => {
+        if (prev.length >= 2) {
+          setRulerDistance(null);
+          return [pt];
+        }
+        const next = [...prev, pt];
+        if (next.length === 2) {
+          setRulerDistance(haversineDistanceFeet(next[0].lat, next[0].lng, next[1].lat, next[1].lng));
+        }
+        return next;
+      });
+      return;
+    }
     const feature = e.features?.[0];
 
     //console.log("clicked feature =", feature);
@@ -576,7 +600,7 @@ function App() {
         properties: feature.properties as WaterFeatureProperties,
       })
     };
-  }, []);
+  }, [infoMode, rulerMode]);
 
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('grab'), []);
@@ -843,6 +867,70 @@ function App() {
 
                 )}
                 <NavigationControl position="top-right" />
+                {/* Info mode button */}
+                <div style={{
+                  position: 'absolute', top: 155, right: 10, zIndex: 10,
+                }}>
+                  <button
+                    onClick={() => { setInfoMode(m => !m); setInfoCoords(null); }}
+                    title="Click to inspect coordinates"
+                    style={{
+                      width: 29, height: 29, borderRadius: 4, border: '1px solid #ccc',
+                      background: infoMode ? '#4a90d9' : '#fff',
+                      color: infoMode ? '#fff' : '#333',
+                      fontWeight: 'bold', fontSize: 14, cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+                      padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >i</button>
+                </div>
+                {infoMode && infoCoords && (
+                  <div style={{
+                    position: 'absolute', top: 191, right: 10, zIndex: 10,
+                    background: 'rgba(255,255,255,0.95)', padding: '6px 10px',
+                    borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+                    fontFamily: 'Arial, sans-serif', fontSize: 13,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    <div><strong>Lat:</strong> {infoCoords.lat.toFixed(6)}</div>
+                    <div><strong>Lng:</strong> {infoCoords.lng.toFixed(6)}</div>
+                  </div>
+                )}
+                {/* Ruler button */}
+                <div style={{ position: 'absolute', top: 190, right: 10, zIndex: 10 }}>
+                  <button
+                    onClick={() => { setRulerMode(m => !m); setRulerPoints([]); setRulerDistance(null); }}
+                    title="Measure distance between two points"
+                    style={{
+                      width: 29, height: 29, borderRadius: 4, border: '1px solid #ccc',
+                      background: rulerMode ? '#4a90d9' : '#fff',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+                      padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>📏</span>
+                  </button>
+                </div>
+                {rulerMode && (
+                  <div style={{
+                    position: 'absolute', top: 226, right: 10, zIndex: 10,
+                    background: 'rgba(255,255,255,0.95)', padding: '6px 10px',
+                    borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+                    fontFamily: 'Arial, sans-serif', fontSize: 13,
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {rulerPoints.length === 0 && <div>Click point 1</div>}
+                    {rulerPoints.length === 1 && <div>Click point 2</div>}
+                    {rulerPoints.length === 2 && rulerDistance !== null && (
+                      <>
+                        <div><strong>{rulerDistance.toFixed(1)} ft</strong></div>
+                        <div style={{ color: '#666' }}>{(rulerDistance / 5280).toFixed(3)} mi</div>
+                        <div style={{ color: '#999', fontSize: 11 }}>Click to remeasure</div>
+                      </>
+                    )}
+                  </div>
+                )}
                 <ScaleControl position="bottom-right" unit='imperial' maxWidth={500} />
                 <GeolocateControl position="top-right" positionOptions={{ enableHighAccuracy: true }}
                   trackUserLocation={true}
