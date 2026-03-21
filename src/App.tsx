@@ -261,7 +261,7 @@ function App() {
     //console.log(name);
     client.models.Location.create({
       date: date,
-      time: time,
+      time: time ? time.slice(0, 5) : time,
       track: track,
       type: type,
       diameter: diameter,
