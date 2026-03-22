@@ -152,6 +152,77 @@ interface PopupInfo {
 }
 
 
+function useExpenseAggregates() {
+  const [items, setItems] = useState<Array<Schema["Location"]["type"]>>([]);
+
+  useEffect(() => {
+    const sub = client.models.Location.observeQuery().subscribe({
+      next: ({ items }) => setItems(items),
+      error: (err) => console.error(err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  return useMemo(() => {
+    const byCategory: ByCategory = {};
+    const byTypeTrack: Record<string, { type: string; track: string; count: number; sum: number }> = {};
+    const byType: ByCategory = {};
+    const byDiameterTypeTrack: Record<string, { diameter: string; type: string; track: string; count: number; sum: number }> = {};
+    let totalSum = 0;
+
+    for (const e of items) {
+      const cat = e.track ?? 0;
+      const amt = Number(e.length ?? 0);
+      totalSum += amt;
+
+      if (!byCategory[cat]) byCategory[cat] = { count: 0, sum: 0 };
+      byCategory[cat].count += 1;
+      byCategory[cat].sum += amt;
+
+      const typeVal = e.type ?? "";
+      const trackVal = String(e.track ?? "");
+      const key = `${typeVal}|${trackVal}`;
+      if (!byTypeTrack[key]) byTypeTrack[key] = { type: typeVal, track: trackVal, count: 0, sum: 0 };
+      byTypeTrack[key].count += 1;
+      byTypeTrack[key].sum += amt;
+
+      if (!byType[typeVal]) byType[typeVal] = { count: 0, sum: 0 };
+      byType[typeVal].count += 1;
+      byType[typeVal].sum += amt;
+
+      const diamVal = String(e.diameter ?? "");
+      const dKey = `${diamVal}|${typeVal}|${trackVal}`;
+      if (!byDiameterTypeTrack[dKey]) byDiameterTypeTrack[dKey] = { diameter: diamVal, type: typeVal, track: trackVal, count: 0, sum: 0 };
+      byDiameterTypeTrack[dKey].count += 1;
+      byDiameterTypeTrack[dKey].sum += amt;
+    }
+
+    return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack };
+  }, [items]);
+}
+
+function useManholeAggregates() {
+  const [manholeCount, setManholeCount] = useState(0);
+  const [stormwaterNoJointCount, setStormwaterNoJointCount] = useState(0);
+
+  useEffect(() => {
+    const sub = client.models.Location.observeQuery().subscribe({
+      next: ({ items }) => {
+        setManholeCount(
+          items.filter((e) => (e.type ?? "").toLowerCase() === "wastewater" && e.joint !== true).length
+        );
+        setStormwaterNoJointCount(
+          items.filter((e) => (e.type ?? "").toLowerCase() === "stormwater" && e.joint !== true).length
+        );
+      },
+      error: (err) => console.error(err),
+    });
+    return () => sub.unsubscribe();
+  }, []);
+
+  return { manholeCount, stormwaterNoJointCount };
+}
+
 function App() {
 
   const { signOut } = useAuthenticator();
@@ -184,7 +255,9 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { byTypeTrack, byType, byDiameterTypeTrack, manholeItems, stormwaterNoJoint } = useExpenseAggregates();
+  const { byTypeTrack, byType, byDiameterTypeTrack } = useExpenseAggregates();
+  const { manholeCount, stormwaterNoJointCount } = useManholeAggregates();
+
 
   //const { data } = useGeoJSON();
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null);
@@ -458,70 +531,6 @@ function App() {
   }
 
   //end Hong's addition
-
-  function useExpenseAggregates() {
-    const [items, setItems] = useState<Array<Schema["Location"]["type"]>>([]);
-
-    useEffect(() => {
-      // Realtime query (updates when data changes)
-      const sub = client.models.Location.observeQuery({
-        // optional: add filter to limit what you pull down
-        // filter: { createdAt: { ge: "2025-12-01T00:00:00.000Z" } },
-      }).subscribe({
-        next: ({ items }) => setItems(items),
-        error: (err) => console.error(err),
-      });
-
-      return () => sub.unsubscribe();
-    }, []);
-
-    const aggregates = useMemo(() => {
-      const byCategory: ByCategory = {};
-      const byTypeTrack: Record<string, { type: string; track: string; count: number; sum: number }> = {};
-      const byType: ByCategory = {};
-      const byDiameterTypeTrack: Record<string, { diameter: string; type: string; track: string; count: number; sum: number }> = {};
-      let totalSum = 0;
-
-      for (const e of items) {
-        const cat = e.track ?? 0;
-        const amt = Number(e.length ?? 0);
-
-        totalSum += amt;
-
-        if (!byCategory[cat]) byCategory[cat] = { count: 0, sum: 0 };
-        byCategory[cat].count += 1;
-        byCategory[cat].sum += amt;
-
-        const typeVal = e.type ?? "";
-        const trackVal = String(e.track ?? "");
-        const key = `${typeVal}|${trackVal}`;
-        if (!byTypeTrack[key]) byTypeTrack[key] = { type: typeVal, track: trackVal, count: 0, sum: 0 };
-        byTypeTrack[key].count += 1;
-        byTypeTrack[key].sum += amt;
-
-        if (!byType[typeVal]) byType[typeVal] = { count: 0, sum: 0 };
-        byType[typeVal].count += 1;
-        byType[typeVal].sum += amt;
-
-        const diamVal = String(e.diameter ?? "");
-        const dKey = `${diamVal}|${typeVal}|${trackVal}`;
-        if (!byDiameterTypeTrack[dKey]) byDiameterTypeTrack[dKey] = { diameter: diamVal, type: typeVal, track: trackVal, count: 0, sum: 0 };
-        byDiameterTypeTrack[dKey].count += 1;
-        byDiameterTypeTrack[dKey].sum += amt;
-      }
-
-      const manholeItems = items.filter(
-        (e) => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false
-      );
-      const stormwaterNoJoint = items.filter(
-        (e) => (e.type ?? "").toLowerCase() === "stormwater" && e.joint === false
-      );
-
-      return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack, manholeItems, stormwaterNoJoint };
-    }, [items]);
-
-    return aggregates;
-  }
 
   function haversineDistanceFeet(lat1: number, lng1: number, lat2: number, lng2: number): number {
     const R = 20902231; // Earth radius in feet
@@ -989,7 +998,11 @@ function App() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {location.map((location) => (
+                      {[...location].sort((a, b) =>
+                        (a.track ?? 0) - (b.track ?? 0) ||
+                        (a.date ?? "").localeCompare(b.date ?? "") ||
+                        (a.time ?? "").localeCompare(b.time ?? "")
+                      ).map((location) => (
                         <TableRow
                           onDoubleClick={(e) => {
                             console.log("location photos url =", location.photos)
@@ -1112,8 +1125,7 @@ function App() {
                   <TableBody>
                     {Object.values(byDiameterTypeTrack)
                       .sort((a, b) =>
-                        a.type.localeCompare(b.type) ||
-                        a.track.localeCompare(b.track) ||
+                        (parseInt(a.track) - parseInt(b.track)) ||
                         parseFloat(a.diameter) - parseFloat(b.diameter)
                       )
                       .map((row) => (
@@ -1135,13 +1147,25 @@ function App() {
             value: "8",
             content: (<>
               <ThemeProvider theme={theme} colorMode="light">
-                <p style={{ fontFamily: 'Arial, sans-serif', marginBottom: '4px' }}>
-                  <strong>Number of Manholes in Wastewater System:</strong> {manholeItems.length}
-                </p>
-                <p style={{ fontFamily: 'Arial, sans-serif', marginBottom: '8px' }}>
-                  <strong>Numnber of Manholes in Stormwater System:</strong> {stormwaterNoJoint.length}
-                </p>
-                
+                <Table caption="" highlightOnHover={false} variation="striped"
+                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell as="th">Type</TableCell>
+                      <TableCell as="th">Count (Joint = No)</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>Wastewater</TableCell>
+                      <TableCell>{manholeCount}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>Stormwater</TableCell>
+                      <TableCell>{stormwaterNoJointCount}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </ThemeProvider>
             </>)
           },
