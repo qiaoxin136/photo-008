@@ -285,7 +285,7 @@ function App() {
     setDiameter(diameter);
     setUserName("");
     setDescription("");
-    setJoint(false);
+    setJoint(joint);
     setLat(0);
     setLng(0);
   }
@@ -739,7 +739,7 @@ function App() {
                     type='circle'
                     source='water-data'
                     paint={{
-                      'circle-radius': 6,
+                      'circle-radius': ['case', ['==', ['get', 'joint'], false], 9, 5],
                       'circle-color': [
                         'match',
                         ['get', 'type'],
