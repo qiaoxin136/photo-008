@@ -739,7 +739,7 @@ function App() {
                     type='circle'
                     source='water-data'
                     paint={{
-                      'circle-radius': ['case', ['==', ['get', 'joint'], false], 9, 5],
+                      'circle-radius': ['case', ['==', ['get', 'joint'], false], 12, 6],
                       'circle-color': [
                         'match',
                         ['get', 'type'],
