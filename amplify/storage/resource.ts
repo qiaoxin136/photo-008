@@ -10,7 +10,7 @@ export const imagesStorage = defineStorage({
     ],
     'originals/*/*': [
       allow.authenticated.to(['read', 'write', 'delete']),
-      allow.guest.to(['read']),
+      allow.guest.to(['read']),  
     ],
   })
 })
