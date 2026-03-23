@@ -201,27 +201,6 @@ function useExpenseAggregates() {
   }, [items]);
 }
 
-function useManholeAggregates() {
-  const [manholeCount, setManholeCount] = useState(0);
-  const [stormwaterNoJointCount, setStormwaterNoJointCount] = useState(0);
-
-  useEffect(() => {
-    const sub = client.models.Location.observeQuery().subscribe({
-      next: ({ items }) => {
-        setManholeCount(
-          items.filter((e) => (e.type ?? "").toLowerCase() === "wastewater" && e.joint !== true).length
-        );
-        setStormwaterNoJointCount(
-          items.filter((e) => (e.type ?? "").toLowerCase() === "stormwater" && e.joint !== true).length
-        );
-      },
-      error: (err) => console.error(err),
-    });
-    return () => sub.unsubscribe();
-  }, []);
-
-  return { manholeCount, stormwaterNoJointCount };
-}
 
 function App() {
 
@@ -256,7 +235,6 @@ function App() {
 
 
   const { byTypeTrack, byType, byDiameterTypeTrack } = useExpenseAggregates();
-  const { manholeCount, stormwaterNoJointCount } = useManholeAggregates();
 
 
   //const { data } = useGeoJSON();
@@ -1158,11 +1136,11 @@ function App() {
                   <TableBody>
                     <TableRow>
                       <TableCell>Wastewater</TableCell>
-                      <TableCell>{manholeCount}</TableCell>
+                      <TableCell>{location.filter(e => (e.type ?? "").toLowerCase() === "wastewater" && e.joint !== true).length}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell>Stormwater</TableCell>
-                      <TableCell>{stormwaterNoJointCount}</TableCell>
+                      <TableCell>{location.filter(e => (e.type ?? "").toLowerCase() === "stormwater" && e.joint !== true).length}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
