@@ -5,9 +5,7 @@ import { checkLoginAndGetName } from "./utils/AuthUtils";
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from "aws-amplify/data";
 import "@aws-amplify/ui-react/styles.css";
-import { uploadData, remove } from "aws-amplify/storage";
-import { StorageImage } from "@aws-amplify/ui-react-storage"; //Hong
-
+import { uploadData, remove, downloadData } from "aws-amplify/storage";
 import type { MapMouseEvent } from "mapbox-gl";
 
 
@@ -74,6 +72,27 @@ import "@aws-amplify/ui-react/styles.css";
 import './FeaturePopup.css';
 
 const MAPBOX_TOKEN = "pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmMnY0NzE1MGMzMjNycGp6bDQwcWZsNyJ9.1JJeWIQgrykU5b3oqSr1sQ";
+
+function PhotoImage({ path, alt, height }: { path: string; alt: string; height: number }) {
+  const [src, setSrc] = useState<string>("");
+  const [err, setErr] = useState<string>("");
+  useEffect(() => {
+    setSrc(""); setErr("");
+    console.log("PhotoImage loading path:", path);
+    let blobUrl = "";
+    downloadData({ path }).result
+      .then(async r => {
+        const blob = await r.body.blob();
+        blobUrl = URL.createObjectURL(blob);
+        setSrc(blobUrl);
+      })
+      .catch(e => { console.error("PhotoImage error:", e); setErr(String(e)); });
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [path]);
+  if (err) return <span style={{ color: 'red', fontSize: 11, marginLeft: 10 }}>{path}: {err}</span>;
+  if (!src) return <span style={{ color: '#999', fontSize: 11, marginLeft: 10 }}>loading {path}…</span>;
+  return <img src={src} alt={alt} height={height} style={{ marginLeft: '10px' }} />;
+}
 const client = generateClient<Schema>();
 
 type ByCategory = Record<string, { count: number; sum: number }>;
@@ -391,37 +410,24 @@ function App() {
 
   async function handleSubmit(event: SyntheticEvent, id: string) {
     event.preventDefault();
-    //console.log(id);
-    //console.log(userName);
 
-    if (userName) {
-      let placePhotosUrls: string[] = [];
-      console.log("before submit, photoes size ", placePhotos.length);
-      const uploadResult = await uploadPhotos(placePhotos, id)   //Hong
-      placePhotosUrls = uploadResult.urls;
+    if (placePhotos.length === 0) return;
 
-      const currentLoc = await client.models.Location.get({
-        id: id
-      })
+    const uploadResult = await uploadPhotos(placePhotos, id);
+    const placePhotosUrls = uploadResult.urls;
 
-      let revised: string[] = []
-      if (currentLoc.data?.photos) {
-        currentLoc.data.photos.forEach(
-          (d) => {
-            d ? revised.push(d) : null
-          }
-        )
-      }
-
-      await client.models.Location.update({
-        id: id,
-        photos: [...placePhotosUrls, ...revised]
-
-      })
-
-
-      clearFields();
+    const currentLoc = await client.models.Location.get({ id });
+    const revised: string[] = [];
+    if (currentLoc.data?.photos) {
+      currentLoc.data.photos.forEach(d => { if (d) revised.push(d); });
     }
+
+    await client.models.Location.update({
+      id,
+      photos: [...placePhotosUrls, ...revised],
+    });
+
+    clearFields();
   }
 
   function clearFields() {
@@ -454,7 +460,7 @@ function App() {
   }
 
   //Hong's addition
-  function previewPhotos(event: CustomEvent) {
+  function previewPhotos(event: ChangeEvent<HTMLInputElement>) {
 
     if (event.target.files) {
       const eventPhotos = Array.from(event.target.files);
@@ -479,9 +485,8 @@ function App() {
               &nbsp; &nbsp; &nbsp;</h4>)
           loc.photos.forEach((photo, idx) => {
             if (photo) {
-              rows.push(<StorageImage path={photo}
-                alt={photo} key={index * 1000 + idx} height={300}
-                style={{ marginLeft: '10px' }} />)
+              rows.push(<PhotoImage path={photo}
+                alt={photo} key={index * 1000 + idx} height={300} />)
             }
           })
 
@@ -1016,15 +1021,6 @@ function App() {
             </>)
           },
           {
-            label: "Photos",
-            value: "4",
-            content: (<>
-              <h3>Photos and Comments</h3>
-              {renderPhotos()}
-            </>)
-          },
-          
-          {
             label: "Statistics by Track",
             value: "5",
             content: (<>
@@ -1145,6 +1141,27 @@ function App() {
                   </TableBody>
                 </Table>
               </ThemeProvider>
+            </>)
+          },
+          {
+            label: "Photos",
+            value: "9",
+            content: (<>
+              {[...location]
+                .sort((a, b) => (a.track ?? 0) - (b.track ?? 0))
+                .filter(loc => loc.photos && loc.photos.length > 0)
+                .map((loc, locIdx) => (
+                  <div key={loc.id} style={{ marginBottom: 24 }}>
+                    <h4 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>
+                      Track {loc.track} &nbsp;|&nbsp; {loc.date} &nbsp;|&nbsp; {loc.type} &nbsp;|&nbsp; {loc.description}
+                    </h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      {loc.photos!.filter(Boolean).map((photo, idx) => (
+                        <PhotoImage key={locIdx * 1000 + idx} path={photo!} alt={photo!} height={250} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
             </>)
           },
         ]}
