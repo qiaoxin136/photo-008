@@ -1,13 +1,13 @@
 import type { ChangeEvent, SyntheticEvent } from "react";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { checkLoginAndGetName } from "./utils/AuthUtils";
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from "aws-amplify/data";
 import "@aws-amplify/ui-react/styles.css";
+import './App.css';
 import { uploadData, remove } from "aws-amplify/storage";
 import type { MapMouseEvent } from "mapbox-gl";
-
 
 import 'mapbox-gl/dist/mapbox-gl.css';
 //import { useGeoJSON } from './useGeoJSON';
@@ -17,8 +17,6 @@ import './MapView.css';
 
 //import { MapboxOverlay, MapboxOverlayProps } from "@deck.gl/mapbox/typed";
 //import { PickingInfo } from "@deck.gl/core/typed";
-
-import "@aws-amplify/ui-react/styles.css";
 
 import "maplibre-gl/dist/maplibre-gl.css"; // Import maplibre-gl styles
 
@@ -35,9 +33,6 @@ import {
   Popup
 } from "react-map-gl";
 
-
-
-import "mapbox-gl/dist/mapbox-gl.css";
 
 
 import {
@@ -61,10 +56,6 @@ import {
   // TextField,
 } from "@aws-amplify/ui-react";
 
-import "@aws-amplify/ui-react/styles.css";
-
-import "@aws-amplify/ui-react/styles.css";
-
 //import { IconLayer } from "@deck.gl/layers/typed";
 
 
@@ -75,7 +66,6 @@ const MAPBOX_TOKEN = "pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmMnY0NzE1MGMzMjNycGp
 
 const client = generateClient<Schema>();
 
-type ByCategory = Record<string, { count: number; sum: number }>;
 
 
 const theme: Theme = {
@@ -151,54 +141,6 @@ interface PopupInfo {
 }
 
 
-function useExpenseAggregates() {
-  const [items, setItems] = useState<Array<Schema["Location"]["type"]>>([]);
-
-  useEffect(() => {
-    const sub = client.models.Location.observeQuery().subscribe({
-      next: ({ items }) => setItems(items),
-      error: (err) => console.error(err),
-    });
-    return () => sub.unsubscribe();
-  }, []);
-
-  return useMemo(() => {
-    const byCategory: ByCategory = {};
-    const byTypeTrack: Record<string, { type: string; track: string; count: number; sum: number }> = {};
-    const byType: ByCategory = {};
-    const byDiameterTypeTrack: Record<string, { diameter: string; type: string; track: string; count: number; sum: number }> = {};
-    let totalSum = 0;
-
-    for (const e of items) {
-      const cat = e.track ?? 0;
-      const amt = Number(e.length ?? 0);
-      totalSum += amt;
-
-      if (!byCategory[cat]) byCategory[cat] = { count: 0, sum: 0 };
-      byCategory[cat].count += 1;
-      byCategory[cat].sum += amt;
-
-      const typeVal = e.type ?? "";
-      const trackVal = String(e.track ?? "");
-      const key = `${typeVal}|${trackVal}`;
-      if (!byTypeTrack[key]) byTypeTrack[key] = { type: typeVal, track: trackVal, count: 0, sum: 0 };
-      byTypeTrack[key].count += 1;
-      byTypeTrack[key].sum += amt;
-
-      if (!byType[typeVal]) byType[typeVal] = { count: 0, sum: 0 };
-      byType[typeVal].count += 1;
-      byType[typeVal].sum += amt;
-
-      const diamVal = String(e.diameter ?? "");
-      const dKey = `${diamVal}|${typeVal}|${trackVal}`;
-      if (!byDiameterTypeTrack[dKey]) byDiameterTypeTrack[dKey] = { diameter: diamVal, type: typeVal, track: trackVal, count: 0, sum: 0 };
-      byDiameterTypeTrack[dKey].count += 1;
-      byDiameterTypeTrack[dKey].sum += amt;
-    }
-
-    return { totalSum, byCategory, totalCount: items.length, byTypeTrack, byType, byDiameterTypeTrack };
-  }, [items]);
-}
 
 type LocationItem = Schema["Location"]["type"];
 
@@ -225,41 +167,37 @@ function buildCostRows(records: LocationItem[], typeFilter: string, priceMap: Re
   return Object.values(aggregated).sort((a, b) => a.track - b.track || a.diameter - b.diameter);
 }
 
-const colW = { type: '15%', track: '10%', diameter: '15%', length: '15%', price: '15%', cost: '15%' };
-const numStyle: React.CSSProperties = { textAlign: 'right' };
-const txtStyle: React.CSSProperties = { textAlign: 'left' };
 
 function CostTable({ rows, title }: { rows: AggRow[]; title: string }) {
   const totalCost = rows.reduce((s, r) => s + r.cost, 0);
   return (
-    <div style={{ marginBottom: 32 }}>
-      <h3 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>{title}</h3>
-      <Table caption="" highlightOnHover={false} variation="striped"
-        style={{ width: '100%', fontFamily: 'Arial, sans-serif', tableLayout: 'fixed' }}>
+    <div className="cost-table-section">
+      <h3>{title}</h3>
+      <Table caption="" highlightOnHover={false} variation="striped" className="cost-table">
         <TableHead>
           <TableRow>
-            <TableCell as="th" style={{ ...txtStyle, width: colW.type }}>Type</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: colW.track }}>Track</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: colW.diameter }}>Diameter (in)</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: colW.length }}>Length (ft)</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: colW.price }}>Price ($/ft)</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: colW.cost }}>Cost ($)</TableCell>
+            <TableCell as="th" className="cost-th-type">Type</TableCell>
+            <TableCell as="th" className="cost-th-track">Track</TableCell>
+            <TableCell as="th" className="cost-th-dia">Diameter (in)</TableCell>
+            <TableCell as="th" className="cost-th-len">Length (ft)</TableCell>
+            <TableCell as="th" className="cost-th-price">Price ($/ft)</TableCell>
+            <TableCell as="th" className="cost-th-cost">Cost ($)</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((r, i) => (
             <TableRow key={i}>
-              <TableCell style={txtStyle}>{r.type}</TableCell>
-              <TableCell style={numStyle}>{r.track}</TableCell>
-              <TableCell style={numStyle}>{r.diameter}</TableCell>
-              <TableCell style={numStyle}>{Math.round(r.length)}</TableCell>
-              <TableCell style={numStyle}>{r.price}</TableCell>
-              <TableCell style={numStyle}>${r.cost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</TableCell>
+              <TableCell className="cell-text">{r.type}</TableCell>
+              <TableCell className="cell-num">{r.track}</TableCell>
+              <TableCell className="cell-num">{r.diameter}</TableCell>
+              <TableCell className="cell-num">{Math.round(r.length)}</TableCell>
+              <TableCell className="cell-num">{r.price}</TableCell>
+              <TableCell className="cell-num">${r.cost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</TableCell>
             </TableRow>
           ))}
           <TableRow>
-            <TableCell colSpan={5} style={txtStyle}><strong>Total Cost</strong></TableCell>
-            <TableCell style={numStyle}><strong>${totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></TableCell>
+            <TableCell colSpan={5} className="cell-text"><strong>Total Cost</strong></TableCell>
+            <TableCell className="cell-num"><strong>${totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -279,30 +217,29 @@ function MHTable({ records }: { records: LocationItem[] }) {
   const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
 
   return (
-    <div style={{ marginBottom: 32 }}>
-      <h3 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>Manholes (MH)</h3>
-      <Table caption="" highlightOnHover={false} variation="striped"
-        style={{ width: '100%', fontFamily: 'Arial, sans-serif', tableLayout: 'fixed' }}>
+    <div className="cost-table-section">
+      <h3>Manholes (MH)</h3>
+      <Table caption="" highlightOnHover={false} variation="striped" className="cost-table">
         <TableHead>
           <TableRow>
-            <TableCell as="th" style={{ ...txtStyle, width: '30%' }}>Type</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: '15%' }}>MH Count</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: '20%' }}>Unit Cost ($)</TableCell>
-            <TableCell as="th" style={{ ...numStyle, width: '20%' }}>Total Cost ($)</TableCell>
+            <TableCell as="th" className="mh-th-type">Type</TableCell>
+            <TableCell as="th" className="mh-th-count">MH Count</TableCell>
+            <TableCell as="th" className="mh-th-unit">Unit Cost ($)</TableCell>
+            <TableCell as="th" className="mh-th-total">Total Cost ($)</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((r, i) => (
             <TableRow key={i}>
-              <TableCell style={txtStyle}>{r.type}</TableCell>
-              <TableCell style={numStyle}>{r.count}</TableCell>
-              <TableCell style={numStyle}>${r.unitCost.toLocaleString('en-US')}</TableCell>
-              <TableCell style={numStyle}>${r.totalCost.toLocaleString('en-US')}</TableCell>
+              <TableCell className="cell-text">{r.type}</TableCell>
+              <TableCell className="cell-num">{r.count}</TableCell>
+              <TableCell className="cell-num">${r.unitCost.toLocaleString('en-US')}</TableCell>
+              <TableCell className="cell-num">${r.totalCost.toLocaleString('en-US')}</TableCell>
             </TableRow>
           ))}
           <TableRow>
-            <TableCell colSpan={3} style={txtStyle}><strong>Total Cost</strong></TableCell>
-            <TableCell style={numStyle}><strong>${totalCost.toLocaleString('en-US')}</strong></TableCell>
+            <TableCell colSpan={3} className="cell-text"><strong>Total Cost</strong></TableCell>
+            <TableCell className="cell-num"><strong>${totalCost.toLocaleString('en-US')}</strong></TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -359,7 +296,6 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { byTypeTrack: _byTypeTrack, byType: _byType, byDiameterTypeTrack: _byDiameterTypeTrack } = useExpenseAggregates();
 
 
   //const { data } = useGeoJSON();
@@ -493,20 +429,18 @@ function App() {
     console.log("id=", id)
     console.log("photourl=", photourls)
 
-    photourls.forEach(
-      async (aPath) => {
-        if (aPath)
-          try {
-            await remove({ path: aPath })
-          } catch (error) {
-            console.error('Error deleting photoes:', error);
-            return { response: 299, info: 'failed' }
-          }
+    for (const aPath of photourls) {
+      if (aPath) {
+        try {
+          await remove({ path: aPath });
+        } catch (error) {
+          console.error('Error deleting photos:', error);
+          return { response: 299, info: 'failed' };
+        }
       }
-    )
+    }
 
-
-    client.models.Location.delete({ id })
+    await client.models.Location.delete({ id });
 
     return { response: 200, info: 'success' };
     /*
@@ -723,9 +657,7 @@ function App() {
           Cal
         </Button>
         {calResult && (
-          <span style={{ alignSelf: "center", fontSize: "0.9rem", color: "#333", marginLeft: "8px" }}>
-            {calResult}
-          </span>
+          <span className="cal-result">{calResult}</span>
         )}
       </Flex>
       <br />
@@ -782,7 +714,7 @@ function App() {
           onChange={handleDescription}
           width="800px"
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Arial, sans-serif' }}>
+        <label className="joint-label">
           <input
             type="checkbox"
             checked={joint}
@@ -804,6 +736,7 @@ function App() {
             value: "1",
             content: (<>
               <Map
+                style={{ width: "100%", height: "1000px" }}
                 initialViewState={{
                   longitude: -80.20321,
                   latitude: 26.00068,
@@ -813,11 +746,6 @@ function App() {
                 //mapLib={maplibregl}
                 mapStyle={basemap} // Use any MapLibre-compatible style
 
-                style={{
-                  width: "100%",
-                  height: "1000px",
-                  borderColor: "#000000",
-                }}
                 interactiveLayerIds={['water-points']}
                 onClick={onClick}
                 onMouseEnter={onMouseEnter}
@@ -960,65 +888,38 @@ function App() {
                 )}
                 <NavigationControl position="top-right" />
                 {/* Info mode button */}
-                <div style={{
-                  position: 'absolute', top: 155, right: 10, zIndex: 10,
-                }}>
+                <div className="map-overlay-btn map-overlay-btn--info">
                   <button
                     onClick={() => { setInfoMode(m => !m); setInfoCoords(null); }}
                     title="Click to inspect coordinates"
-                    style={{
-                      width: 29, height: 29, borderRadius: 4, border: '1px solid #ccc',
-                      background: infoMode ? '#4a90d9' : '#fff',
-                      color: infoMode ? '#fff' : '#333',
-                      fontWeight: 'bold', fontSize: 14, cursor: 'pointer',
-                      boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-                      padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
+                    className={`map-btn${infoMode ? ' active' : ''}`}
                   >i</button>
                 </div>
                 {infoMode && infoCoords && (
-                  <div style={{
-                    position: 'absolute', top: 191, right: 10, zIndex: 10,
-                    background: 'rgba(255,255,255,0.95)', padding: '6px 10px',
-                    borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-                    fontFamily: 'Arial, sans-serif', fontSize: 13,
-                    whiteSpace: 'nowrap',
-                  }}>
+                  <div className="map-overlay-popup map-overlay-popup--coords">
                     <div><strong>Lat:</strong> {infoCoords.lat.toFixed(6)}</div>
                     <div><strong>Lng:</strong> {infoCoords.lng.toFixed(6)}</div>
                   </div>
                 )}
                 {/* Ruler button */}
-                <div style={{ position: 'absolute', top: 190, right: 10, zIndex: 10 }}>
+                <div className="map-overlay-btn map-overlay-btn--ruler">
                   <button
                     onClick={() => { setRulerMode(m => !m); setRulerPoints([]); setRulerDistance(null); }}
                     title="Measure distance between two points"
-                    style={{
-                      width: 29, height: 29, borderRadius: 4, border: '1px solid #ccc',
-                      background: rulerMode ? '#4a90d9' : '#fff',
-                      cursor: 'pointer',
-                      boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-                      padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
+                    className={`map-btn${rulerMode ? ' active' : ''}`}
                   >
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>📏</span>
+                    <span className="ruler-icon">📏</span>
                   </button>
                 </div>
                 {rulerMode && (
-                  <div style={{
-                    position: 'absolute', top: 226, right: 10, zIndex: 10,
-                    background: 'rgba(255,255,255,0.95)', padding: '6px 10px',
-                    borderRadius: 4, boxShadow: '0 1px 4px rgba(0,0,0,.3)',
-                    fontFamily: 'Arial, sans-serif', fontSize: 13,
-                    whiteSpace: 'nowrap',
-                  }}>
+                  <div className="map-overlay-popup map-overlay-popup--ruler">
                     {rulerPoints.length === 0 && <div>Click point 1</div>}
                     {rulerPoints.length === 1 && <div>Click point 2</div>}
                     {rulerPoints.length === 2 && rulerDistance !== null && (
                       <>
                         <div><strong>{rulerDistance.toFixed(1)} ft</strong></div>
-                        <div style={{ color: '#666' }}>{(rulerDistance / 5280).toFixed(3)} mi</div>
-                        <div style={{ color: '#999', fontSize: 11 }}>Click to remeasure</div>
+                        <div className="ruler-mi">{(rulerDistance / 5280).toFixed(3)} mi</div>
+                        <div className="ruler-hint">Click to remeasure</div>
                       </>
                     )}
                   </div>
@@ -1059,12 +960,7 @@ function App() {
 
               >
                 <ThemeProvider theme={theme} colorMode="light">
-                  <Table caption="" highlightOnHover={false} variation="striped"
-                    style={{
-                      //tableLayout: 'fixed',
-                      width: '100%',
-                      fontFamily: 'Arial, sans-serif',
-                    }}>
+                  <Table caption="" highlightOnHover={false} variation="striped" className="data-table">
                     <TableHead>
                       <TableRow>
                         <TableCell as="th" /* style={{ width: '15%' }} */>Date</TableCell>
@@ -1123,7 +1019,7 @@ function App() {
           {
             label: "Cost Tracking",
             value: "11",
-            content: <div style={{ overflowY: 'auto', maxHeight: '75vh' }}><WaterCostDetailTab records={location} priceMap={priceMap} /></div>
+            content: <div className="water-cost-tab"><WaterCostDetailTab records={location} priceMap={priceMap} /></div>
           },
         ]}
       />
