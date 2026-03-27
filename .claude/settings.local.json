@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(grep -E \"\\\\.\\(html|js|jsx|ts|tsx|css\\)$\")"
+      "Bash(grep -E \"\\\\.\\(html|js|jsx|ts|tsx|css\\)$\")",
+      "WebFetch(domain:50fb42daa5.execute-api.us-east-1.amazonaws.com)"
     ]
   }
 }

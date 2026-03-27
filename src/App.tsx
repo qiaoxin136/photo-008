@@ -220,6 +220,80 @@ function useExpenseAggregates() {
   }, [items]);
 }
 
+type LocationItem = Schema["Location"]["type"];
+
+function PhotosTab({ records }: { records: LocationItem[] }) {
+  const sorted = [...records]
+    .filter(loc => loc.photos && loc.photos.length > 0)
+    .sort((a, b) =>
+      (a.type ?? "").localeCompare(b.type ?? "") ||
+      (a.track ?? 0) - (b.track ?? 0) ||
+      (a.date ?? "").localeCompare(b.date ?? "") ||
+      (a.time ?? "").localeCompare(b.time ?? "")
+    );
+
+  return (
+    <>
+      {sorted.map((loc, locIdx) => (
+        <div key={loc.id} style={{ marginBottom: 24 }}>
+          <h4 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>
+            {loc.type} &nbsp;|&nbsp; Track {loc.track} &nbsp;|&nbsp; {loc.date} {loc.time}
+          </h4>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {loc.photos!.filter(Boolean).map((photo, idx) => (
+              <PhotoImage key={locIdx * 1000 + idx} path={photo!} alt={photo!} height={250} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function WaterCostTab({ records, priceMap }: { records: LocationItem[]; priceMap: Record<number, number> }) {
+  const waterRows = [...records]
+    .filter(e => (e.type ?? "").toLowerCase() === "water")
+    .map(e => {
+      const dia = parseInt(String(e.diameter ?? 0));
+      const price = priceMap[dia] ?? 0;
+      const cost = (e.length ?? 0) * price;
+      return { type: e.type ?? "", track: e.track ?? 0, diameter: dia, length: e.length ?? 0, price, cost };
+    })
+    .sort((a, b) => a.track - b.track || a.diameter - b.diameter);
+  const totalCost = waterRows.reduce((s, r) => s + r.cost, 0);
+
+  return (
+    <ThemeProvider theme={theme} colorMode="light">
+      <Table caption="" highlightOnHover={false} variation="striped"
+        style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+        <TableHead>
+          <TableRow>
+            <TableCell as="th">Type</TableCell>
+            <TableCell as="th">Track</TableCell>
+            <TableCell as="th">Diameter (in)</TableCell>
+            <TableCell as="th">Price ($/ft)</TableCell>
+            <TableCell as="th">Cost ($)</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {waterRows.map((r, i) => (
+            <TableRow key={i}>
+              <TableCell>{r.type}</TableCell>
+              <TableCell>{r.track}</TableCell>
+              <TableCell>{r.diameter}</TableCell>
+              <TableCell>{r.price}</TableCell>
+              <TableCell>{r.cost.toFixed(0)}</TableCell>
+            </TableRow>
+          ))}
+          <TableRow>
+            <TableCell colSpan={4}><strong>Total Cost</strong></TableCell>
+            <TableCell><strong>{totalCost.toFixed(0)}</strong></TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </ThemeProvider>
+  );
+}
 
 function App() {
 
@@ -237,6 +311,7 @@ function App() {
   const [userName, setUserName] = useState<string>();
   const [description, setDescription] = useState<string>("");
   const [joint, setJoint] = useState<boolean>(true);
+  const [priceMap, setPriceMap] = useState<Record<number, number>>({});
   const [lat, setLat] = useState(0);
   const [lng, setLng] = useState(0);
   const [placePhotos, setPlacePhotos] = useState<File[]>([]);
@@ -324,6 +399,29 @@ function App() {
 
   useEffect(() => {
     handleUserName();
+  }, []);
+
+  useEffect(() => {
+    console.log("price fetch: starting...");
+    fetch("https://50fb42daa5.execute-api.us-east-1.amazonaws.com/test/getData")
+      .then(r => { console.log("price fetch: got response, status=", r.status); return r.text(); })
+      .then(text => {
+        console.log("price fetch: raw text=", text.substring(0, 200));
+        const match = text.match(/\[[\s\S]*\]/);
+        if (!match) throw new Error("No array found in price API response");
+        // Strip trailing commas before parsing (common in DynamoDB responses)
+        const cleaned = match[0].replace(/,\s*([\]}])/g, '$1');
+        console.log("price fetch: cleaned=", cleaned.substring(0, 200));
+        const data: Array<{ diameter: string | number; price: string | number }> = JSON.parse(cleaned);
+        console.log("price fetch: parsed rows=", data.length);
+        const map: Record<number, number> = {};
+        data.forEach(row => {
+          map[parseInt(String(row.diameter))] = parseInt(String(row.price));
+        });
+        console.log("price fetch: map built=", JSON.stringify(map));
+        setPriceMap(map);
+      })
+      .catch(e => console.error("price fetch error:", e));
   }, []);
 
 
@@ -1021,148 +1119,14 @@ function App() {
             </>)
           },
           {
-            label: "Statistics by Track",
-            value: "5",
-            content: (<>
-              <ThemeProvider theme={theme} colorMode="light">
-                <Table caption="" highlightOnHover={false} variation="striped"
-                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell as="th">Type</TableCell>
-                      <TableCell as="th">Track</TableCell>
-                      <TableCell as="th">Count</TableCell>
-                      <TableCell as="th">Total Length (ft)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.values(byTypeTrack)
-                      .sort((a, b) => a.track.localeCompare(b.track) || a.type.localeCompare(b.type))
-                      .map((row) => (
-                        <TableRow key={`${row.type}|${row.track}`}>
-                          <TableCell>{row.type}</TableCell>
-                          <TableCell>{row.track}</TableCell>
-                          <TableCell>{row.count}</TableCell>
-                          <TableCell>{row.sum.toFixed(0)}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </ThemeProvider>
-            </>)
-          },
-          {
-            label: "Statistics by Type",
-            value: "6",
-            content: (<>
-              <ThemeProvider theme={theme} colorMode="light">
-                <Table caption="" highlightOnHover={false} variation="striped"
-                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell as="th">Type</TableCell>
-                      <TableCell as="th">Count</TableCell>
-                      <TableCell as="th">Total Length (ft)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.entries(byType)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([type, v]) => (
-                        <TableRow key={type}>
-                          <TableCell>{type}</TableCell>
-                          <TableCell>{v.count}</TableCell>
-                          <TableCell>{v.sum.toFixed(0)}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </ThemeProvider>
-            </>)
-          },
-          {
-            label: "Statistics by Diameter",
-            value: "7",
-            content: (<>
-              <ThemeProvider theme={theme} colorMode="light">
-                <Table caption="" highlightOnHover={false} variation="striped"
-                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell as="th">Type</TableCell>
-                      <TableCell as="th">Track</TableCell>
-                      <TableCell as="th">Diameter (in)</TableCell>
-                      <TableCell as="th">Count</TableCell>
-                      <TableCell as="th">Total Length (ft)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.values(byDiameterTypeTrack)
-                      .sort((a, b) =>
-                        (parseInt(a.track) - parseInt(b.track)) ||
-                        parseFloat(a.diameter) - parseFloat(b.diameter)
-                      )
-                      .map((row) => (
-                        <TableRow key={`${row.diameter}|${row.type}|${row.track}`}>
-                          <TableCell>{row.type}</TableCell>
-                          <TableCell>{row.track}</TableCell>
-                          <TableCell>{row.diameter}</TableCell>
-                          <TableCell>{row.count}</TableCell>
-                          <TableCell>{row.sum.toFixed(0)}</TableCell>
-                        </TableRow>
-                      ))}
-                  </TableBody>
-                </Table>
-              </ThemeProvider>
-            </>)
-          },
-          {
-            label: "Manhole",
-            value: "8",
-            content: (<>
-              <ThemeProvider theme={theme} colorMode="light">
-                <Table caption="" highlightOnHover={false} variation="striped"
-                  style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell as="th">Type</TableCell>
-                      <TableCell as="th">Count (Joint = No)</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>Wastewater</TableCell>
-                      <TableCell>{location.filter(e => (e.type ?? "").toLowerCase() === "wastewater" && e.joint !== true).length}</TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>Stormwater</TableCell>
-                      <TableCell>{location.filter(e => (e.type ?? "").toLowerCase() === "stormwater" && e.joint !== true).length}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </ThemeProvider>
-            </>)
+            label: "Water Cost",
+            value: "10",
+            content: <WaterCostTab records={location} priceMap={priceMap} />
           },
           {
             label: "Photos",
-            value: "9",
-            content: (<>
-              {[...location]
-                .sort((a, b) => (a.track ?? 0) - (b.track ?? 0))
-                .filter(loc => loc.photos && loc.photos.length > 0)
-                .map((loc, locIdx) => (
-                  <div key={loc.id} style={{ marginBottom: 24 }}>
-                    <h4 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>
-                      Track {loc.track} &nbsp;|&nbsp; {loc.date} &nbsp;|&nbsp; {loc.type} &nbsp;|&nbsp; {loc.description}
-                    </h4>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {loc.photos!.filter(Boolean).map((photo, idx) => (
-                        <PhotoImage key={locIdx * 1000 + idx} path={photo!} alt={photo!} height={250} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-            </>)
+            value: "11",
+            content: <PhotosTab records={location} />
           },
         ]}
       />
