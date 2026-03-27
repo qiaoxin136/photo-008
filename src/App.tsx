@@ -5,7 +5,7 @@ import { checkLoginAndGetName } from "./utils/AuthUtils";
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { generateClient } from "aws-amplify/data";
 import "@aws-amplify/ui-react/styles.css";
-import { uploadData, remove, downloadData } from "aws-amplify/storage";
+import { uploadData, remove } from "aws-amplify/storage";
 import type { MapMouseEvent } from "mapbox-gl";
 
 
@@ -73,26 +73,6 @@ import './FeaturePopup.css';
 
 const MAPBOX_TOKEN = "pk.eyJ1IjoiaGF6ZW5zYXd5ZXIiLCJhIjoiY2xmMnY0NzE1MGMzMjNycGp6bDQwcWZsNyJ9.1JJeWIQgrykU5b3oqSr1sQ";
 
-function PhotoImage({ path, alt, height }: { path: string; alt: string; height: number }) {
-  const [src, setSrc] = useState<string>("");
-  const [err, setErr] = useState<string>("");
-  useEffect(() => {
-    setSrc(""); setErr("");
-    console.log("PhotoImage loading path:", path);
-    let blobUrl = "";
-    downloadData({ path }).result
-      .then(async r => {
-        const blob = await r.body.blob();
-        blobUrl = URL.createObjectURL(blob);
-        setSrc(blobUrl);
-      })
-      .catch(e => { console.error("PhotoImage error:", e); setErr(String(e)); });
-    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
-  }, [path]);
-  if (err) return <span style={{ color: 'red', fontSize: 11, marginLeft: 10 }}>{path}: {err}</span>;
-  if (!src) return <span style={{ color: '#999', fontSize: 11, marginLeft: 10 }}>loading {path}…</span>;
-  return <img src={src} alt={alt} height={height} style={{ marginLeft: '10px' }} />;
-}
 const client = generateClient<Schema>();
 
 type ByCategory = Record<string, { count: number; sum: number }>;
@@ -222,78 +202,129 @@ function useExpenseAggregates() {
 
 type LocationItem = Schema["Location"]["type"];
 
-function PhotosTab({ records }: { records: LocationItem[] }) {
-  const sorted = [...records]
-    .filter(loc => loc.photos && loc.photos.length > 0)
-    .sort((a, b) =>
-      (a.type ?? "").localeCompare(b.type ?? "") ||
-      (a.track ?? 0) - (b.track ?? 0) ||
-      (a.date ?? "").localeCompare(b.date ?? "") ||
-      (a.time ?? "").localeCompare(b.time ?? "")
-    );
 
-  return (
-    <>
-      {sorted.map((loc, locIdx) => (
-        <div key={loc.id} style={{ marginBottom: 24 }}>
-          <h4 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>
-            {loc.type} &nbsp;|&nbsp; Track {loc.track} &nbsp;|&nbsp; {loc.date} {loc.time}
-          </h4>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {loc.photos!.filter(Boolean).map((photo, idx) => (
-              <PhotoImage key={locIdx * 1000 + idx} path={photo!} alt={photo!} height={250} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </>
-  );
+type AggRow = { type: string; track: number; diameter: number; length: number; price: number; cost: number };
+
+function buildCostRows(records: LocationItem[], typeFilter: string, priceMap: Record<number, number>): AggRow[] {
+  const aggregated: Record<string, AggRow> = {};
+  records
+    .filter(e => (e.type ?? "").toLowerCase() === typeFilter)
+    .forEach(e => {
+      const dia = parseInt(String(e.diameter ?? 0));
+      const price = parseInt(String(priceMap[dia] ?? 0));
+      const length = e.length ?? 0;
+      const cost = length * price;
+      const key = `${typeFilter}|${e.track ?? 0}|${dia}`;
+      if (aggregated[key]) {
+        aggregated[key].length += length;
+        aggregated[key].cost += cost;
+      } else {
+        aggregated[key] = { type: e.type ?? "", track: e.track ?? 0, diameter: dia, length, price, cost };
+      }
+    });
+  return Object.values(aggregated).sort((a, b) => a.track - b.track || a.diameter - b.diameter);
 }
 
-function WaterCostTab({ records, priceMap }: { records: LocationItem[]; priceMap: Record<number, number> }) {
-  const waterRows = [...records]
-    .filter(e => (e.type ?? "").toLowerCase() === "water")
-    .map(e => {
-      const dia = parseInt(String(e.diameter ?? 0));
-      const price = priceMap[dia] ?? 0;
-      const cost = (e.length ?? 0) * price;
-      return { type: e.type ?? "", track: e.track ?? 0, diameter: dia, length: e.length ?? 0, price, cost };
-    })
-    .sort((a, b) => a.track - b.track || a.diameter - b.diameter);
-  const totalCost = waterRows.reduce((s, r) => s + r.cost, 0);
+const colW = { type: '15%', track: '10%', diameter: '15%', length: '15%', price: '15%', cost: '15%' };
+const numStyle: React.CSSProperties = { textAlign: 'right' };
+const txtStyle: React.CSSProperties = { textAlign: 'left' };
 
+function CostTable({ rows, title }: { rows: AggRow[]; title: string }) {
+  const totalCost = rows.reduce((s, r) => s + r.cost, 0);
   return (
-    <ThemeProvider theme={theme} colorMode="light">
+    <div style={{ marginBottom: 32 }}>
+      <h3 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>{title}</h3>
       <Table caption="" highlightOnHover={false} variation="striped"
-        style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}>
+        style={{ width: '100%', fontFamily: 'Arial, sans-serif', tableLayout: 'fixed' }}>
         <TableHead>
           <TableRow>
-            <TableCell as="th">Type</TableCell>
-            <TableCell as="th">Track</TableCell>
-            <TableCell as="th">Diameter (in)</TableCell>
-            <TableCell as="th">Price ($/ft)</TableCell>
-            <TableCell as="th">Cost ($)</TableCell>
+            <TableCell as="th" style={{ ...txtStyle, width: colW.type }}>Type</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: colW.track }}>Track</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: colW.diameter }}>Diameter (in)</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: colW.length }}>Length (ft)</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: colW.price }}>Price ($/ft)</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: colW.cost }}>Cost ($)</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {waterRows.map((r, i) => (
+          {rows.map((r, i) => (
             <TableRow key={i}>
-              <TableCell>{r.type}</TableCell>
-              <TableCell>{r.track}</TableCell>
-              <TableCell>{r.diameter}</TableCell>
-              <TableCell>{r.price}</TableCell>
-              <TableCell>{r.cost.toFixed(0)}</TableCell>
+              <TableCell style={txtStyle}>{r.type}</TableCell>
+              <TableCell style={numStyle}>{r.track}</TableCell>
+              <TableCell style={numStyle}>{r.diameter}</TableCell>
+              <TableCell style={numStyle}>{Math.round(r.length)}</TableCell>
+              <TableCell style={numStyle}>{r.price}</TableCell>
+              <TableCell style={numStyle}>${r.cost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</TableCell>
             </TableRow>
           ))}
           <TableRow>
-            <TableCell colSpan={4}><strong>Total Cost</strong></TableCell>
-            <TableCell><strong>{totalCost.toFixed(0)}</strong></TableCell>
+            <TableCell colSpan={5} style={txtStyle}><strong>Total Cost</strong></TableCell>
+            <TableCell style={numStyle}><strong>${totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></TableCell>
           </TableRow>
         </TableBody>
       </Table>
+    </div>
+  );
+}
+
+const MH_UNIT_COST = 1500;
+
+function MHTable({ records }: { records: LocationItem[] }) {
+  const wastewaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false).length;
+  const stormwaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "stormwater" && e.joint === false).length;
+  const rows = [
+    { type: "Wastewater", count: wastewaterMH, unitCost: MH_UNIT_COST, totalCost: wastewaterMH * MH_UNIT_COST },
+    { type: "Stormwater", count: stormwaterMH, unitCost: MH_UNIT_COST, totalCost: stormwaterMH * MH_UNIT_COST },
+  ];
+  const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
+
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <h3 style={{ fontFamily: 'Arial, sans-serif', marginBottom: 8 }}>Manholes (MH)</h3>
+      <Table caption="" highlightOnHover={false} variation="striped"
+        style={{ width: '100%', fontFamily: 'Arial, sans-serif', tableLayout: 'fixed' }}>
+        <TableHead>
+          <TableRow>
+            <TableCell as="th" style={{ ...txtStyle, width: '30%' }}>Type</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: '15%' }}>MH Count</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: '20%' }}>Unit Cost ($)</TableCell>
+            <TableCell as="th" style={{ ...numStyle, width: '20%' }}>Total Cost ($)</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((r, i) => (
+            <TableRow key={i}>
+              <TableCell style={txtStyle}>{r.type}</TableCell>
+              <TableCell style={numStyle}>{r.count}</TableCell>
+              <TableCell style={numStyle}>${r.unitCost.toLocaleString('en-US')}</TableCell>
+              <TableCell style={numStyle}>${r.totalCost.toLocaleString('en-US')}</TableCell>
+            </TableRow>
+          ))}
+          <TableRow>
+            <TableCell colSpan={3} style={txtStyle}><strong>Total Cost</strong></TableCell>
+            <TableCell style={numStyle}><strong>${totalCost.toLocaleString('en-US')}</strong></TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function WaterCostDetailTab({ records, priceMap }: { records: LocationItem[]; priceMap: Record<number, number> }) {
+  const waterRows = buildCostRows(records, "water", priceMap);
+  const wastewaterRows = buildCostRows(records, "wastewater", priceMap);
+  const stormwaterRows = buildCostRows(records, "stormwater", priceMap);
+
+  return (
+    <ThemeProvider theme={theme} colorMode="light">
+      <CostTable rows={waterRows} title="Water" />
+      <CostTable rows={wastewaterRows} title="Wastewater" />
+      <CostTable rows={stormwaterRows} title="Stormwater" />
+      <MHTable records={records} />
     </ThemeProvider>
   );
 }
+
 
 function App() {
 
@@ -328,7 +359,7 @@ function App() {
   //const [showPopup, setShowPopup] = useState<boolean>(true);
 
 
-  const { byTypeTrack, byType, byDiameterTypeTrack } = useExpenseAggregates();
+  const { byTypeTrack: _byTypeTrack, byType: _byType, byDiameterTypeTrack: _byDiameterTypeTrack } = useExpenseAggregates();
 
 
   //const { data } = useGeoJSON();
@@ -402,23 +433,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    console.log("price fetch: starting...");
     fetch("https://50fb42daa5.execute-api.us-east-1.amazonaws.com/test/getData")
-      .then(r => { console.log("price fetch: got response, status=", r.status); return r.text(); })
+      .then(r => r.text())
       .then(text => {
-        console.log("price fetch: raw text=", text.substring(0, 200));
-        const match = text.match(/\[[\s\S]*\]/);
-        if (!match) throw new Error("No array found in price API response");
-        // Strip trailing commas before parsing (common in DynamoDB responses)
-        const cleaned = match[0].replace(/,\s*([\]}])/g, '$1');
-        console.log("price fetch: cleaned=", cleaned.substring(0, 200));
-        const data: Array<{ diameter: string | number; price: string | number }> = JSON.parse(cleaned);
-        console.log("price fetch: parsed rows=", data.length);
+        // API returns malformed JSON; each inner object is valid JSON, so parse them individually
+        const blocks = text.match(/\{[^{}]*"diameter"[^{}]*"price"[^{}]*\}/g) ?? [];
         const map: Record<number, number> = {};
-        data.forEach(row => {
-          map[parseInt(String(row.diameter))] = parseInt(String(row.price));
+        blocks.forEach(block => {
+          try {
+            const item: { diameter: string | number; price: string | number } = JSON.parse(block);
+            map[parseInt(String(item.diameter))] = parseInt(String(item.price));
+          } catch {}
         });
-        console.log("price fetch: map built=", JSON.stringify(map));
         setPriceMap(map);
       })
       .catch(e => console.error("price fetch error:", e));
@@ -569,30 +595,6 @@ function App() {
     }
   }
 
-  function renderPhotos() {
-
-    const rows: any[] = []
-
-    if (location) {
-
-      location.forEach((loc, index) => {
-        if (loc.photos) {
-
-          rows.push(
-            <h4>Date: {loc.date}  &nbsp; &nbsp;&nbsp; Description: {loc.description}
-              &nbsp; &nbsp; &nbsp;</h4>)
-          loc.photos.forEach((photo, idx) => {
-            if (photo) {
-              rows.push(<PhotoImage path={photo}
-                alt={photo} key={index * 1000 + idx} height={300} />)
-            }
-          })
-
-        }
-      })
-    }
-    return rows;
-  }
 
   async function deleteLocationPhotos(locId: string): Promise<{
     response: number
@@ -1119,14 +1121,9 @@ function App() {
             </>)
           },
           {
-            label: "Water Cost",
-            value: "10",
-            content: <WaterCostTab records={location} priceMap={priceMap} />
-          },
-          {
-            label: "Photos",
+            label: "Cost Tracking",
             value: "11",
-            content: <PhotosTab records={location} />
+            content: <div style={{ overflowY: 'auto', maxHeight: '75vh' }}><WaterCostDetailTab records={location} priceMap={priceMap} /></div>
           },
         ]}
       />
