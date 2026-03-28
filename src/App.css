@@ -1,8 +1,7 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
 .logo {
@@ -95,15 +94,12 @@
   font-family: Arial, sans-serif;
 }
 
-/* ── Map — break out of #root max-width/padding to fill full viewport width ── */
+/* ── Map tab — strip all padding so map fills full screen width ── */
 .amplify-tabs__content:has(.mapboxgl-map) {
   padding: 0 !important;
-  margin: 0 !important;
-  max-width: 100vw !important;
-  width: 100vw !important;
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
+}
+#root:has(.mapboxgl-map) {
+  padding: 0 !important;
 }
 
 /* ── Map overlay buttons ── */

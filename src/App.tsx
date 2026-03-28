@@ -286,11 +286,6 @@ function App() {
 
   const [tab, setTab] = useState("1");
   const [basemap, setBasemap] = useState("mapbox://styles/mapbox/streets-v12");
-  const [infoMode, setInfoMode] = useState(false);
-  const [infoCoords, setInfoCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [rulerMode, setRulerMode] = useState(false);
-  const [rulerPoints, setRulerPoints] = useState<{ lat: number; lng: number }[]>([]);
-  const [rulerDistance, setRulerDistance] = useState<number | null>(null);
 
   //const [clickInfo, setClickInfo] = useState<DataT>();
   //const [showPopup, setShowPopup] = useState<boolean>(true);
@@ -589,25 +584,6 @@ function App() {
   }
 
   const onClick = useCallback((e: MapMouseEvent) => {
-    if (infoMode) {
-      setInfoCoords({ lat: e.lngLat.lat, lng: e.lngLat.lng });
-      return;
-    }
-    if (rulerMode) {
-      const pt = { lat: e.lngLat.lat, lng: e.lngLat.lng };
-      setRulerPoints(prev => {
-        if (prev.length >= 2) {
-          setRulerDistance(null);
-          return [pt];
-        }
-        const next = [...prev, pt];
-        if (next.length === 2) {
-          setRulerDistance(haversineDistanceFeet(next[0].lat, next[0].lng, next[1].lat, next[1].lng));
-        }
-        return next;
-      });
-      return;
-    }
     const feature = e.features?.[0];
 
     //console.log("clicked feature =", feature);
@@ -626,7 +602,7 @@ function App() {
         properties: feature.properties as WaterFeatureProperties,
       })
     };
-  }, [infoMode, rulerMode]);
+  }, []);
 
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
   const onMouseLeave = useCallback(() => setCursor('grab'), []);
@@ -887,43 +863,6 @@ function App() {
 
                 )}
                 <NavigationControl position="top-right" />
-                {/* Info mode button */}
-                <div className="map-overlay-btn map-overlay-btn--info">
-                  <button
-                    onClick={() => { setInfoMode(m => !m); setInfoCoords(null); }}
-                    title="Click to inspect coordinates"
-                    className={`map-btn${infoMode ? ' active' : ''}`}
-                  >i</button>
-                </div>
-                {infoMode && infoCoords && (
-                  <div className="map-overlay-popup map-overlay-popup--coords">
-                    <div><strong>Lat:</strong> {infoCoords.lat.toFixed(6)}</div>
-                    <div><strong>Lng:</strong> {infoCoords.lng.toFixed(6)}</div>
-                  </div>
-                )}
-                {/* Ruler button */}
-                <div className="map-overlay-btn map-overlay-btn--ruler">
-                  <button
-                    onClick={() => { setRulerMode(m => !m); setRulerPoints([]); setRulerDistance(null); }}
-                    title="Measure distance between two points"
-                    className={`map-btn${rulerMode ? ' active' : ''}`}
-                  >
-                    <span className="ruler-icon">📏</span>
-                  </button>
-                </div>
-                {rulerMode && (
-                  <div className="map-overlay-popup map-overlay-popup--ruler">
-                    {rulerPoints.length === 0 && <div>Click point 1</div>}
-                    {rulerPoints.length === 1 && <div>Click point 2</div>}
-                    {rulerPoints.length === 2 && rulerDistance !== null && (
-                      <>
-                        <div><strong>{rulerDistance.toFixed(1)} ft</strong></div>
-                        <div className="ruler-mi">{(rulerDistance / 5280).toFixed(3)} mi</div>
-                        <div className="ruler-hint">Click to remeasure</div>
-                      </>
-                    )}
-                  </div>
-                )}
                 <ScaleControl position="bottom-right" unit='imperial' maxWidth={500} />
                 <GeolocateControl position="top-right" positionOptions={{ enableHighAccuracy: true }}
                   trackUserLocation={true}
