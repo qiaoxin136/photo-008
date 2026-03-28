@@ -168,8 +168,12 @@ function buildCostRows(records: LocationItem[], typeFilter: string, priceMap: Re
 }
 
 
-function CostTable({ rows, title }: { rows: AggRow[]; title: string }) {
-  const totalCost = rows.reduce((s, r) => s + r.cost, 0);
+const MH_UNIT_COST = 1500;
+
+function CostTable({ rows, title, mhCount = 0 }: { rows: AggRow[]; title: string; mhCount?: number }) {
+  const pipeCost = rows.reduce((s, r) => s + r.cost, 0);
+  const mhCost = mhCount * MH_UNIT_COST;
+  const totalCost = pipeCost + mhCost;
   return (
     <div className="cost-table-section">
       <h3>{title}</h3>
@@ -195,51 +199,17 @@ function CostTable({ rows, title }: { rows: AggRow[]; title: string }) {
               <TableCell className="cell-num">${r.cost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</TableCell>
             </TableRow>
           ))}
+          {mhCount > 0 && (
+            <TableRow>
+              <TableCell className="cell-text">MH</TableCell>
+              <TableCell className="cell-num" colSpan={3}>{mhCount} × ${MH_UNIT_COST.toLocaleString('en-US')}</TableCell>
+              <TableCell className="cell-num" colSpan={1}></TableCell>
+              <TableCell className="cell-num">${mhCost.toLocaleString('en-US')}</TableCell>
+            </TableRow>
+          )}
           <TableRow>
             <TableCell colSpan={5} className="cell-text"><strong>Total Cost</strong></TableCell>
             <TableCell className="cell-num"><strong>${totalCost.toLocaleString('en-US', { maximumFractionDigits: 0 })}</strong></TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-const MH_UNIT_COST = 1500;
-
-function MHTable({ records }: { records: LocationItem[] }) {
-  const wastewaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false).length;
-  const stormwaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "stormwater" && e.joint === false).length;
-  const rows = [
-    { type: "Wastewater", count: wastewaterMH, unitCost: MH_UNIT_COST, totalCost: wastewaterMH * MH_UNIT_COST },
-    { type: "Stormwater", count: stormwaterMH, unitCost: MH_UNIT_COST, totalCost: stormwaterMH * MH_UNIT_COST },
-  ];
-  const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
-
-  return (
-    <div className="cost-table-section">
-      <h3>Manholes (MH)</h3>
-      <Table caption="" highlightOnHover={false} variation="striped" className="cost-table">
-        <TableHead>
-          <TableRow>
-            <TableCell as="th" className="mh-th-type">Type</TableCell>
-            <TableCell as="th" className="mh-th-count">MH Count</TableCell>
-            <TableCell as="th" className="mh-th-unit">Unit Cost ($)</TableCell>
-            <TableCell as="th" className="mh-th-total">Total Cost ($)</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={i}>
-              <TableCell className="cell-text">{r.type}</TableCell>
-              <TableCell className="cell-num">{r.count}</TableCell>
-              <TableCell className="cell-num">${r.unitCost.toLocaleString('en-US')}</TableCell>
-              <TableCell className="cell-num">${r.totalCost.toLocaleString('en-US')}</TableCell>
-            </TableRow>
-          ))}
-          <TableRow>
-            <TableCell colSpan={3} className="cell-text"><strong>Total Cost</strong></TableCell>
-            <TableCell className="cell-num"><strong>${totalCost.toLocaleString('en-US')}</strong></TableCell>
           </TableRow>
         </TableBody>
       </Table>
@@ -251,13 +221,14 @@ function WaterCostDetailTab({ records, priceMap }: { records: LocationItem[]; pr
   const waterRows = buildCostRows(records, "water", priceMap);
   const wastewaterRows = buildCostRows(records, "wastewater", priceMap);
   const stormwaterRows = buildCostRows(records, "stormwater", priceMap);
+  const wastewaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "wastewater" && e.joint === false).length;
+  const stormwaterMH = records.filter(e => (e.type ?? "").toLowerCase() === "stormwater" && e.joint === false).length;
 
   return (
     <ThemeProvider theme={theme} colorMode="light">
       <CostTable rows={waterRows} title="Water" />
-      <CostTable rows={wastewaterRows} title="Wastewater" />
-      <CostTable rows={stormwaterRows} title="Stormwater" />
-      <MHTable records={records} />
+      <CostTable rows={wastewaterRows} title="Wastewater" mhCount={wastewaterMH} />
+      <CostTable rows={stormwaterRows} title="Stormwater" mhCount={stormwaterMH} />
     </ThemeProvider>
   );
 }
